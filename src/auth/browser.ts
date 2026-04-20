@@ -1,6 +1,3 @@
-import { spawn } from "node:child_process";
-import { createInterface } from "node:readline/promises";
-import { stdin as input, stdout as output } from "node:process";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { chromium } from "playwright-core";

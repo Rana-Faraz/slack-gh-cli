@@ -1,11 +1,34 @@
 import { execFile } from "node:child_process";
-import { access, constants as fsConstants } from "node:fs";
+import { access, constants as fsConstants } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { APP_CLI_NAME } from "../constants/app.js";
 
-const DEFAULT_MACOS_CHROME_PATH =
-  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const MACOS_BROWSER_CANDIDATES = [
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "/Applications/Chromium.app/Contents/MacOS/Chromium",
+  "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+  "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
+  "/Applications/Arc.app/Contents/MacOS/Arc",
+];
+
+const WINDOWS_BROWSER_RELATIVE_PATHS = [
+  ["Google", "Chrome", "Application", "chrome.exe"],
+  ["Chromium", "Application", "chrome.exe"],
+  ["Microsoft", "Edge", "Application", "msedge.exe"],
+  ["BraveSoftware", "Brave-Browser", "Application", "brave.exe"],
+];
+
+const LINUX_BROWSER_COMMANDS = [
+  "google-chrome-stable",
+  "google-chrome",
+  "chromium-browser",
+  "chromium",
+  "microsoft-edge-stable",
+  "microsoft-edge",
+  "brave-browser",
+  "brave-browser-stable",
+];
 
 export const SLACK_WEB_URL = "https://app.slack.com/client";
 
@@ -17,13 +40,17 @@ export async function resolveSlackBrowserExecutablePath(): Promise<string> {
     return configuredPath;
   }
 
-  if (process.platform === "darwin") {
-    await assertExecutableExists(DEFAULT_MACOS_CHROME_PATH, "Google Chrome");
-    return DEFAULT_MACOS_CHROME_PATH;
+  const detectedPath = await detectSlackBrowserExecutablePath();
+
+  if (detectedPath) {
+    return detectedPath;
   }
 
   throw new Error(
-    "Set SLACK_BROWSER_PATH to a Chrome-compatible browser executable on this platform.",
+    [
+      "Could not find a supported Chrome-compatible browser automatically.",
+      "Install Google Chrome, Chromium, Microsoft Edge, Brave, or set SLACK_BROWSER_PATH explicitly.",
+    ].join(" "),
   );
 }
 
@@ -65,17 +92,77 @@ export async function getSlackBrowserRuntimeWarning(
   return undefined;
 }
 
-function assertExecutableExists(path: string, label: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    access(path, fsConstants.X_OK, (error) => {
-      if (error) {
-        reject(new Error(`${label} executable was not found at ${path}.`));
-        return;
-      }
+async function detectSlackBrowserExecutablePath(): Promise<string | undefined> {
+  if (process.platform === "darwin") {
+    return await findExistingExecutable(MACOS_BROWSER_CANDIDATES);
+  }
 
-      resolve();
-    });
-  });
+  if (process.platform === "win32") {
+    return await detectWindowsBrowserExecutablePath();
+  }
+
+  return await detectUnixBrowserExecutablePath();
+}
+
+async function detectWindowsBrowserExecutablePath(): Promise<string | undefined> {
+  const roots = [
+    process.env.PROGRAMFILES,
+    process.env["PROGRAMFILES(X86)"],
+    process.env.LOCALAPPDATA,
+  ].filter((value): value is string => Boolean(value));
+
+  const candidates = roots.flatMap((root) =>
+    WINDOWS_BROWSER_RELATIVE_PATHS.map((relativePath) => join(root, ...relativePath)),
+  );
+
+  return await findExistingExecutable(candidates);
+}
+
+async function detectUnixBrowserExecutablePath(): Promise<string | undefined> {
+  for (const command of LINUX_BROWSER_COMMANDS) {
+    const resolvedPath = await resolveCommandFromPath(command);
+
+    if (resolvedPath) {
+      return resolvedPath;
+    }
+  }
+
+  return undefined;
+}
+
+async function findExistingExecutable(candidates: string[]): Promise<string | undefined> {
+  for (const candidate of candidates) {
+    if (await executableExists(candidate)) {
+      return candidate;
+    }
+  }
+
+  return undefined;
+}
+
+async function assertExecutableExists(path: string, label: string): Promise<void> {
+  if (!(await executableExists(path))) {
+    throw new Error(`${label} executable was not found at ${path}.`);
+  }
+}
+
+async function executableExists(path: string): Promise<boolean> {
+  try {
+    await access(path, process.platform === "win32" ? fsConstants.F_OK : fsConstants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function resolveCommandFromPath(command: string): Promise<string | undefined> {
+  try {
+    const output = await runCommand("which", [command]);
+    const resolvedPath = output.trim();
+    return resolvedPath.length > 0 ? resolvedPath : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 async function isAppleSiliconMac(): Promise<boolean> {

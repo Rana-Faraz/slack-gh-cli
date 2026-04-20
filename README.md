@@ -76,11 +76,13 @@ the Slack app-install limit on free workspaces because it does not rely on Slack
 
 ## Browser auth
 
-By default the CLI looks for Google Chrome at:
+By default the CLI auto-detects a Chrome-compatible browser across macOS, Windows, and Linux. It currently checks common installs for:
 
-```bash
-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome
-```
+- Google Chrome
+- Chromium
+- Microsoft Edge
+- Brave
+- Arc on macOS
 
 Optional overrides:
 
@@ -91,7 +93,7 @@ Optional overrides:
 Example `.env`:
 
 ```bash
-SLACK_BROWSER_PATH=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome
+SLACK_BROWSER_PATH=/path/to/your/browser
 ```
 
 ## Command model
