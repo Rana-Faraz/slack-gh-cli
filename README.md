@@ -21,7 +21,7 @@ slack-cli --help
 Install it globally from a public GitHub repo:
 
 ```bash
-npm install -g https://github.com/<owner>/<repo>.git
+npm install -g https://github.com/Rana-Faraz/slack-gh-cli.git
 slack-cli --help
 ```
 
@@ -37,13 +37,13 @@ npm install -g ./slack-cli-0.1.0.tgz
 Once this repo is public on GitHub, the bundled agent skill can be installed from the same repo with:
 
 ```bash
-npx skills add https://github.com/<owner>/<repo> --skill slack-cli
+npx skills add https://github.com/Rana-Faraz/slack-gh-cli --skill slack-cli
 ```
 
 Or install just the skill folder directly:
 
 ```bash
-npx skills add https://github.com/<owner>/<repo>/tree/main/skills/slack-cli
+npx skills add https://github.com/Rana-Faraz/slack-gh-cli/tree/main/skills/slack-cli
 ```
 
 This repo now includes the publishable skill at `skills/slack-cli/`.
