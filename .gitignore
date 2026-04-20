@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+coverage/
+*.tsbuildinfo
+
+# Environment and local secrets
+.env
+.env.*
+!.env.example
+!.env.sample
+localhost.pem
+localhost-key.pem
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Cache and temp files
+.cache/
+.npm/
+tmp/
+temp/
+
+# OS and editor files
+.DS_Store
+.idea/
+.vscode/

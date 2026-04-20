@@ -1,0 +1,35 @@
+{
+  "name": "slack-cli",
+  "version": "0.1.0",
+  "private": false,
+  "description": "A gh-style local CLI for Slack user workflows.",
+  "type": "module",
+  "bin": {
+    "slack-cli": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/index.ts",
+    "prepare": "npm run build",
+    "prepack": "npm run build",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "commander": "^13.1.0",
+    "cross-keychain": "^1.1.0",
+    "dotenv": "^17.4.2",
+    "playwright-core": "^1.59.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}
