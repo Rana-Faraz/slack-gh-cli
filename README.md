@@ -1,113 +1,269 @@
-# slack-cli
+# slack
 
-A local CLI intended to feel closer to `gh`, but for Slack user workflows.
+`slack` is an unofficial, local-first CLI for Slack user workflows. It is designed to feel familiar if you use `gh`: inspect auth, choose a workspace, search people or channels, and send messages from the terminal.
+
+The CLI reuses the signed-in Slack Desktop session on your machine. It does not require a bot token, a custom Slack app installation, Chrome, Chromium, Playwright, or browser automation.
+
+> This project is not affiliated with, endorsed by, or supported by Slack Technologies, LLC. Slack is a trademark of its respective owner.
+
+## Status
+
+- Runtime support: macOS with Slack Desktop installed and signed in.
+- Test support: Linux, macOS, and Windows through fake adapters and portable fixtures.
+- Windows runtime support: planned through a future `DesktopHost` adapter; today it should fail gracefully as unsupported.
+- Node.js: `>=22`.
+
+## Features
+
+- Reuse the local Slack Desktop user session.
+- List, inspect, and choose workspaces.
+- Search channels and people.
+- Send channel messages or direct messages.
+- Mention users by handle in message text.
+- Preview sends with `--dry-run`.
+- Read longer messages from stdin.
+- Keep OS-specific behavior behind a platform adapter.
 
 ## Install
 
-Build the CLI:
+Install from npm:
 
 ```bash
-npm install
-npm run build
+npm install -g slack-gh-cli
+slack --help
 ```
 
-Install it globally from the local repo during development:
-
-```bash
-npm link
-slack-cli --help
-```
-
-Install it globally from a public GitHub repo:
+Install directly from GitHub:
 
 ```bash
 npm install -g https://github.com/Rana-Faraz/slack-gh-cli.git
-slack-cli --help
+slack --help
 ```
 
-Install it globally from a packed tarball:
+Install from a local checkout:
+
+```bash
+git clone https://github.com/Rana-Faraz/slack-gh-cli.git
+cd slack-gh-cli
+npm install
+npm run build
+npm link
+slack --help
+```
+
+Install from a packed tarball, useful for local release testing:
 
 ```bash
 npm pack
-npm install -g ./slack-cli-0.1.0.tgz
+npm install -g ./slack-gh-cli-0.1.0.tgz
 ```
 
-## Install The Agent Skill
+## Quick Start
 
-Once this repo is public on GitHub, the bundled agent skill can be installed from the same repo with:
+Check whether Slack Desktop auth is available:
 
 ```bash
-npx skills add https://github.com/Rana-Faraz/slack-gh-cli --skill slack-cli
+slack auth status
 ```
 
-Or install just the skill folder directly:
+Open Slack Desktop if auth is missing:
 
 ```bash
-npx skills add https://github.com/Rana-Faraz/slack-gh-cli/tree/main/skills/slack-cli
+slack auth login
 ```
 
-This repo now includes the publishable skill at `skills/slack-cli/`.
+List workspaces:
 
-## Current status
+```bash
+slack workspace list
+```
 
-This is an initial scaffold. The CLI currently exposes a browser-session auth flow plus early channel and DM commands.
+Set the default workspace:
+
+```bash
+slack workspace use example-workspace
+```
+
+Search for a person and dry-run a message:
+
+```bash
+slack dm search alex
+slack dm send --handle @alex.morgan --message "hello from the CLI" --dry-run
+```
+
+Send the message:
+
+```bash
+slack dm send --handle @alex.morgan --message "hello from the CLI"
+```
 
 ## Commands
 
 ```bash
-npm run dev -- auth status
-npm run dev -- auth login
-npm run dev -- channel list
-npm run dev -- channel search general
-npm run dev -- channel send --channel general --message "hello"
-npm run dev -- dm list
-npm run dev -- dm search rana
-npm run dev -- dm send --handle @adil.sarwar --message "hello"
+slack auth status
+slack auth login
+
+slack workspace list
+slack workspace current
+slack workspace use <workspace>
+slack workspace clear
+
+slack channel list
+slack channel search <query>
+slack channel send --channel <name> --message <text>
+slack channel send --channel-id <id> --message <text>
+
+slack dm list
+slack dm search <query>
+slack dm send --user <name> --message <text>
+slack dm send --handle <handle> --message <text>
+slack dm send --user-id <id> --message <text>
 ```
 
-`auth status` currently checks these auth sources:
-
-1. `SLACK_GH_TOKEN`
-2. OS credential store item `service="slack-cli"` and `account="default"`
-3. local persistent browser profile used for Slack Web
-
-`auth login` opens Slack Web in a persistent Chrome profile that the CLI can reuse later. This avoids
-the Slack app-install limit on free workspaces because it does not rely on Slack OAuth app installation.
-
-## Browser auth
-
-By default the CLI auto-detects a Chrome-compatible browser across macOS, Windows, and Linux. It currently checks common installs for:
-
-- Google Chrome
-- Chromium
-- Microsoft Edge
-- Brave
-- Arc on macOS
-
-Optional overrides:
-
-- `SLACK_BROWSER_PATH` to point at a Chrome-compatible browser executable
-- `SLACK_BROWSER_PROFILE_DIR` to change where the persistent browser profile is stored
-- `SLACK_GH_KEYCHAIN_SERVICE` / `SLACK_GH_KEYCHAIN_ACCOUNT` to change the secure-store service/account labels
-
-Example `.env`:
+Every command and subcommand supports `--help`:
 
 ```bash
-SLACK_BROWSER_PATH=/path/to/your/browser
+slack --help
+slack dm send --help
 ```
 
-## Command model
+## Workspace Selection
 
-- `channel list` lists accessible public/private channels
-- `channel search <query>` searches channels by substring
-- `channel send` sends to an exact channel name or channel ID
-- `dm list` lists existing one-to-one direct messages
-- `dm search <query>` searches human users by name or handle
-- `dm send` sends by exact display name, user ID, or handle
+By default, the CLI follows the workspace selected in Slack Desktop. You can save a CLI default:
 
-## Send behavior
+```bash
+slack workspace use example-workspace
+```
 
-- `--message` sends inline text
-- `--stdin` reads message text from stdin
-- `--dry-run` resolves the target and prints the translated Slack message without sending
-- markdown-ish input is translated to Slack formatting for common cases like bold, italics, code, and links
+The default is stored in `~/.slack/config.json`. Clear it with:
+
+```bash
+slack workspace clear
+```
+
+Use a workspace for one command without changing the saved default:
+
+```bash
+slack dm search alex --workspace example-workspace
+slack channel list --workspace T0123456789
+```
+
+`workspace list` marks each workspace:
+
+- `desktop`: selected in Slack Desktop.
+- `default`: selected by the saved CLI default.
+- `auth`: a usable cached desktop token is available.
+- `no-auth`: Slack Desktop knows about the workspace, but no usable cached token was found.
+
+## Sending Messages
+
+Use inline text:
+
+```bash
+slack channel send --channel general --message "deploy is done"
+```
+
+Use stdin:
+
+```bash
+printf 'multi-line\nmessage\n' | slack dm send --handle @alex.morgan --stdin
+```
+
+Preview target resolution and formatting:
+
+```bash
+slack dm send --handle @alex.morgan --message '**hello** @alex.morgan' --dry-run
+```
+
+Supported formatting:
+
+- `**bold**`
+- `*italic*`
+- inline code with backticks
+- fenced code blocks
+- `[label](https://example.com)` links
+- `@handle` mentions when the handle resolves in the active workspace
+
+## How Desktop Auth Works
+
+On macOS, `slack auth status` checks:
+
+1. `/Applications/Slack.app`
+2. `~/Library/Application Support/Slack`
+3. Slack Desktop's cached workspace tokens from Electron/Chromium LevelDB
+4. the encrypted Slack Desktop session cookie
+
+The macOS adapter uses system tools that are normally available on macOS:
+
+- `open` to launch Slack Desktop
+- `security` to read Slack's safe-storage key from Keychain
+- `sqlite3` to read Slack Desktop's cookie store
+
+See [docs/security-model.md](docs/security-model.md) for what the CLI reads, where it writes, and what it does not store.
+
+## Architecture
+
+The project uses a small set of domain Modules:
+
+- `src/session`: Desktop Session, Workspace Credential, Workspace Catalog, and Slack Web requests.
+- `src/workspace`: Workspace Snapshot loading and Workspace Directory queries.
+- `src/message`: message input, rendering, dispatch, and conversation writes.
+- `src/platform`: OS adapters and local desktop storage readers.
+- `src/commands`: thin Commander adapters.
+- `src/cli`: CLI option parsing and output presenters.
+
+The domain vocabulary is documented in [CONTEXT.md](CONTEXT.md). A deeper architecture overview lives in [docs/architecture.md](docs/architecture.md).
+
+Platform support is tracked in [docs/platform-support.md](docs/platform-support.md).
+
+## Development
+
+```bash
+npm install
+npm run typecheck
+npm run test
+npm run test:coverage
+npm run build
+```
+
+Run locally without linking:
+
+```bash
+npm run dev -- --help
+```
+
+The test suite uses portable fixtures and fake adapters. It does not read real Slack Desktop data, Keychain entries, browser profiles, or OS-specific app paths.
+
+## Releases
+
+Releases are automated from `main` with GitHub Actions and semantic-release. Release notes are generated from conventional commits, GitHub Releases are created automatically, and the package is published to npm as `slack-gh-cli`.
+
+See [docs/releases.md](docs/releases.md) for the release workflow, required `NPM_TOKEN` secret, and commit message rules.
+
+## Agent Skill
+
+This repository includes a publishable Codex skill in `skills/slack/`.
+
+Install from the repository:
+
+```bash
+npx skills add https://github.com/Rana-Faraz/slack-gh-cli --skill slack
+```
+
+Or install just the skill folder:
+
+```bash
+npx skills add https://github.com/Rana-Faraz/slack-gh-cli/tree/main/skills/slack
+```
+
+## Contributing
+
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+
+This project follows [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+
+For security issues, please follow [SECURITY.md](SECURITY.md).
+
+## License
+
+MIT. See [LICENSE](LICENSE).

@@ -1,35 +1,70 @@
 {
-  "name": "slack-cli",
+  "name": "slack-gh-cli",
   "version": "0.1.0",
   "private": false,
   "description": "A gh-style local CLI for Slack user workflows.",
+  "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Rana-Faraz/slack-gh-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Rana-Faraz/slack-gh-cli/issues"
+  },
+  "homepage": "https://github.com/Rana-Faraz/slack-gh-cli#readme",
+  "keywords": [
+    "slack",
+    "cli",
+    "desktop",
+    "automation",
+    "productivity"
+  ],
   "bin": {
-    "slack-cli": "./dist/index.js"
+    "slack": "./dist/index.js"
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "CONTEXT.md",
+    "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md",
+    "SECURITY.md",
+    "docs",
+    "skills/slack"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsx src/index.ts",
     "prepare": "npm run build",
     "prepack": "npm run build",
+    "release": "semantic-release",
+    "release:dry-run": "semantic-release --dry-run",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "engines": {
     "node": ">=22"
   },
   "dependencies": {
-    "commander": "^13.1.0",
-    "cross-keychain": "^1.1.0",
-    "dotenv": "^17.4.2",
-    "playwright-core": "^1.59.1"
+    "classic-level": "^3.0.0",
+    "commander": "^13.1.0"
   },
   "devDependencies": {
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^12.0.6",
+    "@semantic-release/npm": "^13.1.5",
+    "@semantic-release/release-notes-generator": "^14.1.0",
     "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "^4.1.5",
+    "semantic-release": "^25.0.3",
     "tsx": "^4.19.4",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^4.1.5"
   }
 }
