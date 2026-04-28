@@ -5,10 +5,6 @@ on:
   push:
     branches:
       - main
-      - next
-      - "feat/**"
-      - "fix/**"
-      - "chore/**"
 
 jobs:
   verify:
