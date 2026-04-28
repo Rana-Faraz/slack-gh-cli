@@ -1,10 +1,18 @@
 import { Command } from "commander";
-import { setSlackDesktopWorkspaceOverride } from "../slack/desktop.js";
-import { liveSearchUsers } from "../slack/live-search.js";
-import { listDirectMessages, readSlackWorkspaceSnapshot } from "../slack/state.js";
-import { sendDirectMessage } from "../slack/send.js";
-import type { DmSendOptions, WorkspaceScopedOptions } from "../slack/types.js";
+import { parsePositiveIntegerOption } from "../cli/options.js";
+import { printDirectMessages } from "../cli/presenters.js";
+import type { WorkspaceScopedOptions } from "../cli/options.js";
+import type { DirectMessageSendOptions } from "../domain/message.js";
+import { sendDirectMessage } from "../message/default-message-dispatch.js";
+import { setWorkspaceOverride } from "../session/default-desktop-session.js";
+import {
+  listCurrentDirectMessages,
+  searchCurrentUsers,
+} from "../workspace/current-workspace.js";
 
+/**
+ * Registers direct-message commands on the root CLI program.
+ */
 export function registerDmCommands(program: Command): void {
   const dm = program.command("dm").description("Work with Slack direct messages.");
 
@@ -14,13 +22,10 @@ export function registerDmCommands(program: Command): void {
     .option("-L, --limit <limit>", "Number of direct messages to show", "20")
     .option("-w, --workspace <workspace>", "Workspace ID, domain, or name")
     .action(async (options: { limit: string } & WorkspaceScopedOptions) => {
-      setSlackDesktopWorkspaceOverride(options.workspace);
-      const snapshot = await readSlackWorkspaceSnapshot();
-      const items = listDirectMessages(snapshot, parseLimit(options.limit));
-
-      for (const item of items) {
-        console.log(`${item.displayName}\t@${item.handle}\t${item.userId}`);
-      }
+      setWorkspaceOverride(options.workspace);
+      printDirectMessages(
+        await listCurrentDirectMessages(parsePositiveIntegerOption("limit", options.limit)),
+      );
     });
 
   dm
@@ -30,12 +35,10 @@ export function registerDmCommands(program: Command): void {
     .option("-L, --limit <limit>", "Number of people to show", "20")
     .option("-w, --workspace <workspace>", "Workspace ID, domain, or name")
     .action(async (query: string, options: { limit: string } & WorkspaceScopedOptions) => {
-      setSlackDesktopWorkspaceOverride(options.workspace);
-      const items = await liveSearchUsers(query, parseLimit(options.limit));
-
-      for (const item of items) {
-        console.log(`${item.displayName}\t@${item.handle}\t${item.userId}`);
-      }
+      setWorkspaceOverride(options.workspace);
+      printDirectMessages(
+        await searchCurrentUsers(query, parsePositiveIntegerOption("limit", options.limit)),
+      );
     });
 
   dm
@@ -48,18 +51,8 @@ export function registerDmCommands(program: Command): void {
     .option("--stdin", "Read message text from stdin")
     .option("--dry-run", "Resolve target and show the translated message without sending")
     .option("-w, --workspace <workspace>", "Workspace ID, domain, or name")
-    .action(async (options: DmSendOptions) => {
-      setSlackDesktopWorkspaceOverride(options.workspace);
+    .action(async (options: DirectMessageSendOptions) => {
+      setWorkspaceOverride(options.workspace);
       await sendDirectMessage(options);
     });
-}
-
-function parseLimit(value: string): number {
-  const limit = Number.parseInt(value, 10);
-
-  if (!Number.isInteger(limit) || limit < 1) {
-    throw new Error(`Invalid limit: ${value}`);
-  }
-
-  return limit;
 }

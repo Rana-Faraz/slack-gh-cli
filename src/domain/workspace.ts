@@ -1,4 +1,7 @@
-export type SlackUser = {
+/**
+ * A human or bot account visible in a workspace snapshot.
+ */
+export type WorkspaceUser = {
   id: string;
   handle: string;
   displayName: string;
@@ -9,7 +12,10 @@ export type SlackUser = {
   isSelf: boolean;
 };
 
-export type SlackConversation = {
+/**
+ * A Slack conversation known to the selected workspace.
+ */
+export type Conversation = {
   id: string;
   name: string;
   normalizedName: string;
@@ -21,22 +27,31 @@ export type SlackConversation = {
   isOpen: boolean;
 };
 
-export type SlackWorkspaceSnapshot = {
+/**
+ * Command-time view of the selected workspace.
+ */
+export type WorkspaceSnapshot = {
   teamId: string;
   teamName: string;
   teamDomain?: string;
   teamUrl?: string;
   selfUserId?: string;
-  users: SlackUser[];
-  conversations: SlackConversation[];
+  users: WorkspaceUser[];
+  conversations: Conversation[];
 };
 
+/**
+ * Public channel row shown by list and search commands.
+ */
 export type ChannelListItem = {
   id: string;
   name: string;
   visibility: "public" | "private";
 };
 
+/**
+ * Public direct-message row shown by list and search commands.
+ */
 export type DirectMessageListItem = {
   userId: string;
   displayName: string;
@@ -44,25 +59,19 @@ export type DirectMessageListItem = {
   conversationId?: string;
 };
 
-export type ChannelSendOptions = {
+/**
+ * Selector accepted by channel commands.
+ */
+export type ChannelSelector = {
   channel?: string;
   channelId?: string;
-  message?: string;
-  stdin?: boolean;
-  dryRun?: boolean;
-  workspace?: string;
 };
 
-export type DmSendOptions = {
+/**
+ * Selector accepted by direct-message commands.
+ */
+export type UserSelector = {
   user?: string;
   userId?: string;
   handle?: string;
-  message?: string;
-  stdin?: boolean;
-  dryRun?: boolean;
-  workspace?: string;
-};
-
-export type WorkspaceScopedOptions = {
-  workspace?: string;
 };

@@ -1,10 +1,10 @@
 import type {
-  SlackConversation,
-  SlackUser,
-  SlackWorkspaceSnapshot,
-} from "../../src/slack/types.js";
+  Conversation,
+  WorkspaceSnapshot,
+  WorkspaceUser,
+} from "../../src/domain/workspace.js";
 
-export const users: SlackUser[] = [
+export const users: WorkspaceUser[] = [
   {
     id: "U_SELF",
     handle: "self.user",
@@ -73,7 +73,7 @@ export const users: SlackUser[] = [
   },
 ];
 
-export const conversations: SlackConversation[] = [
+export const conversations: Conversation[] = [
   {
     id: "C_GENERAL",
     name: "general",
@@ -129,8 +129,8 @@ export const conversations: SlackConversation[] = [
 ];
 
 export function makeSnapshot(
-  overrides: Partial<SlackWorkspaceSnapshot> = {},
-): SlackWorkspaceSnapshot {
+  overrides: Partial<WorkspaceSnapshot> = {},
+): WorkspaceSnapshot {
   return {
     teamId: "T_EXAMPLE",
     teamName: "Example Workspace",

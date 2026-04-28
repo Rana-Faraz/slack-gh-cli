@@ -1,15 +1,39 @@
 import { describe, expect, it, vi } from "vitest";
-import { createSlackDesktopClient } from "../../src/slack/desktop-client.js";
-import type { SlackDesktopHost } from "../../src/slack/desktop-client.js";
+import { DesktopSessionManager } from "../../src/session/desktop-session-manager.js";
+import type { DesktopHost } from "../../src/platform/desktop-host.js";
 
-describe("SlackDesktopClient platform boundary", () => {
+describe("DesktopSessionManager", () => {
+  it("treats an unsupported Windows host as unavailable without reading desktop state", async () => {
+    const host = makeHost({
+      appPath: "C:\\Users\\Example\\AppData\\Local\\slack\\slack.exe",
+      dataDir: "C:\\Users\\Example\\AppData\\Roaming\\Slack",
+      isSupported: () => false,
+      unsupportedMessage: "Slack Desktop auth is not supported on this host.",
+    });
+
+    await expect(new DesktopSessionManager(host).lookupAuth()).resolves.toEqual({
+      appPath: "C:\\Users\\Example\\AppData\\Local\\slack\\slack.exe",
+      available: false,
+      dataDir: "C:\\Users\\Example\\AppData\\Roaming\\Slack",
+      warning: "Slack Desktop auth is not supported on this host.",
+    });
+    expect(host.assertInstalled).not.toHaveBeenCalled();
+    expect(host.openApp).not.toHaveBeenCalled();
+    expect(host.readRootState).not.toHaveBeenCalled();
+    expect(host.readWorkspacePreference).not.toHaveBeenCalled();
+    expect(host.readClientTokens).not.toHaveBeenCalled();
+    expect(host.readCookie).not.toHaveBeenCalled();
+    expect(host.fetch).not.toHaveBeenCalled();
+    expect(host.writeWorkspacePreference).not.toHaveBeenCalled();
+  });
+
   it("reports unsupported hosts without touching Slack Desktop files", async () => {
     const host = makeHost({
       isSupported: () => false,
       unsupportedMessage: "Slack Desktop auth is not supported on this host.",
     });
 
-    await expect(createSlackDesktopClient(host).lookupAuth()).resolves.toEqual({
+    await expect(new DesktopSessionManager(host).lookupAuth()).resolves.toEqual({
       appPath: "/example/Slack.app",
       available: false,
       dataDir: "/example/slack-data",
@@ -49,7 +73,7 @@ describe("SlackDesktopClient platform boundary", () => {
       readWorkspacePreference: vi.fn(async () => "beta"),
     });
 
-    await expect(createSlackDesktopClient(host).lookupAuth()).resolves.toEqual({
+    await expect(new DesktopSessionManager(host).lookupAuth()).resolves.toEqual({
       appPath: "/example/Slack.app",
       available: true,
       dataDir: "/example/slack-data",
@@ -84,7 +108,7 @@ describe("SlackDesktopClient platform boundary", () => {
       })),
       readWorkspacePreference: vi.fn(async () => "T_EXAMPLE"),
     });
-    const client = createSlackDesktopClient(host);
+    const client = new DesktopSessionManager(host);
 
     await expect(client.saveWorkspacePreference("example")).resolves.toMatchObject({
       configuredDefault: true,
@@ -101,7 +125,7 @@ describe("SlackDesktopClient platform boundary", () => {
   it("opens Slack through the host", async () => {
     const host = makeHost();
 
-    await createSlackDesktopClient(host).openLogin();
+    await new DesktopSessionManager(host).openLogin();
 
     expect(host.assertInstalled).toHaveBeenCalledOnce();
     expect(host.openApp).toHaveBeenCalledOnce();
@@ -130,7 +154,7 @@ describe("SlackDesktopClient platform boundary", () => {
       readWorkspacePreference: vi.fn(async () => undefined),
     });
 
-    await expect(createSlackDesktopClient(host).listWorkspaces()).resolves.toEqual([
+    await expect(new DesktopSessionManager(host).listWorkspaces()).resolves.toEqual([
       {
         authenticated: true,
         configuredDefault: false,
@@ -176,7 +200,7 @@ describe("SlackDesktopClient platform boundary", () => {
       readWorkspacePreference: vi.fn(async () => undefined),
     });
 
-    await expect(createSlackDesktopClient(host).getCurrentWorkspace()).resolves.toMatchObject({
+    await expect(new DesktopSessionManager(host).getCurrentWorkspace()).resolves.toMatchObject({
       configuredDefault: false,
       id: "T_SELECTED",
       selectedInDesktop: true,
@@ -208,7 +232,7 @@ describe("SlackDesktopClient platform boundary", () => {
     });
 
     await expect(
-      createSlackDesktopClient(host).callApi("chat.postMessage", {
+      new DesktopSessionManager(host).request("chat.postMessage", {
         channel: "C_EXAMPLE",
         text: "hello",
       }),
@@ -224,7 +248,7 @@ describe("SlackDesktopClient platform boundary", () => {
       readWorkspacePreference: vi.fn(async () => undefined),
     });
 
-    await expect(createSlackDesktopClient(host).lookupAuth()).resolves.toMatchObject({
+    await expect(new DesktopSessionManager(host).lookupAuth()).resolves.toMatchObject({
       available: false,
       warning:
         "Slack Desktop auth was found, but no cached client token was accepted. Open Slack Desktop and let it refresh, then retry.",
@@ -239,7 +263,7 @@ describe("SlackDesktopClient platform boundary", () => {
       readWorkspacePreference: vi.fn(async () => undefined),
     });
 
-    await expect(createSlackDesktopClient(host).lookupAuth()).resolves.toMatchObject({
+    await expect(new DesktopSessionManager(host).lookupAuth()).resolves.toMatchObject({
       available: false,
       warning: "No Slack Desktop client token found. Open Slack Desktop and sign in first.",
     });
@@ -268,7 +292,7 @@ describe("SlackDesktopClient platform boundary", () => {
     });
 
     await expect(
-      createSlackDesktopClient(host).callApi("chat.postMessage", {
+      new DesktopSessionManager(host).request("chat.postMessage", {
         channel: "C_MISSING",
       }),
     ).rejects.toThrow("channel_not_found");
@@ -296,7 +320,7 @@ describe("SlackDesktopClient platform boundary", () => {
       })),
       readWorkspacePreference: vi.fn(async () => undefined),
     });
-    const client = createSlackDesktopClient(host);
+    const client = new DesktopSessionManager(host);
 
     await expect(client.saveWorkspacePreference("missing")).rejects.toThrow(
       'No Slack Desktop workspace found matching "missing".',
@@ -308,8 +332,8 @@ describe("SlackDesktopClient platform boundary", () => {
 });
 
 function makeHost(
-  overrides: Partial<SlackDesktopHost> = {},
-): SlackDesktopHost {
+  overrides: Partial<DesktopHost> = {},
+): DesktopHost {
   return {
     appPath: "/example/Slack.app",
     assertInstalled: vi.fn(),

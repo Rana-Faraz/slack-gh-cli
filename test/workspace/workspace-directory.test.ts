@@ -1,33 +1,26 @@
 import { describe, expect, it } from "vitest";
-import {
-  findExistingDirectMessage,
-  listChannels,
-  listDirectMessages,
-  resolveChannel,
-  resolveUser,
-  searchChannels,
-  searchUsers,
-} from "../../src/slack/state.js";
+import { WorkspaceDirectory } from "../../src/workspace/workspace-directory.js";
 import { makeSnapshot } from "../fixtures/slack.js";
 
-describe("Slack workspace state selectors", () => {
+describe("WorkspaceDirectory", () => {
   const snapshot = makeSnapshot();
+  const directory = new WorkspaceDirectory(snapshot);
 
   it("lists member channels sorted by name", () => {
-    expect(listChannels(snapshot, 10)).toEqual([
+    expect(directory.listChannels(10)).toEqual([
       { id: "C_GENERAL", name: "general", visibility: "public" },
       { id: "C_PROJECT", name: "project-updates", visibility: "private" },
     ]);
   });
 
   it("searches channels by tokenized names", () => {
-    expect(searchChannels(snapshot, "project updates", 5)).toEqual([
+    expect(directory.searchChannels("project updates", 5)).toEqual([
       { id: "C_PROJECT", name: "project-updates", visibility: "private" },
     ]);
   });
 
   it("lists direct messages without bots, deleted users, or self", () => {
-    expect(listDirectMessages(snapshot, 10)).toEqual([
+    expect(directory.listDirectMessages(10)).toEqual([
       {
         conversationId: "D_ALEX",
         displayName: "Alex Morgan",
@@ -44,7 +37,7 @@ describe("Slack workspace state selectors", () => {
   });
 
   it("searches users by display name, real name, handle, and email", () => {
-    expect(searchUsers(snapshot, "alex example", 5)).toEqual([
+    expect(directory.searchUsers("alex example", 5)).toEqual([
       {
         conversationId: "D_ALEX",
         displayName: "Alex Morgan",
@@ -55,27 +48,27 @@ describe("Slack workspace state selectors", () => {
   });
 
   it("resolves channels by ID or normalized name", () => {
-    expect(resolveChannel(snapshot, { channelId: "C_PROJECT" }).id).toBe("C_PROJECT");
-    expect(resolveChannel(snapshot, { channel: "#general" }).id).toBe("C_GENERAL");
+    expect(directory.resolveChannel({ channelId: "C_PROJECT" }).id).toBe("C_PROJECT");
+    expect(directory.resolveChannel({ channel: "#general" }).id).toBe("C_GENERAL");
   });
 
   it("rejects invalid channel selectors", () => {
-    expect(() => resolveChannel(snapshot, {})).toThrow(
+    expect(() => directory.resolveChannel({})).toThrow(
       "Provide exactly one of --channel or --channel-id.",
     );
-    expect(() => resolveChannel(snapshot, { channelId: "C_MISSING" })).toThrow(
+    expect(() => directory.resolveChannel({ channelId: "C_MISSING" })).toThrow(
       "No channel found for ID C_MISSING.",
     );
   });
 
   it("resolves users by ID, handle, or exact name", () => {
-    expect(resolveUser(snapshot, { userId: "U_ALEX" }).id).toBe("U_ALEX");
-    expect(resolveUser(snapshot, { handle: "@sam.rivera" }).id).toBe("U_SAM");
-    expect(resolveUser(snapshot, { user: "Alex Morgan" }).id).toBe("U_ALEX");
+    expect(directory.resolveUser({ userId: "U_ALEX" }).id).toBe("U_ALEX");
+    expect(directory.resolveUser({ handle: "@sam.rivera" }).id).toBe("U_SAM");
+    expect(directory.resolveUser({ user: "Alex Morgan" }).id).toBe("U_ALEX");
   });
 
   it("uses an existing DM to disambiguate duplicate user names", () => {
-    expect(resolveUser(snapshot, { user: "Jordan Lee" }).id).toBe("U_DUPLICATE_B");
+    expect(directory.resolveUser({ user: "Jordan Lee" }).id).toBe("U_DUPLICATE_B");
   });
 
   it("reports ambiguous users when no existing DM can disambiguate", () => {
@@ -85,13 +78,14 @@ describe("Slack workspace state selectors", () => {
       ),
     });
 
-    expect(() => resolveUser(withoutDuplicateDms, { user: "Jordan Lee" })).toThrow(
-      "Multiple users matched:",
-    );
+    const directoryWithoutDuplicateDms = new WorkspaceDirectory(withoutDuplicateDms);
+
+    expect(() => directoryWithoutDuplicateDms.resolveUser({ user: "Jordan Lee" }))
+      .toThrow("Multiple users matched:");
   });
 
   it("finds existing direct messages by user ID", () => {
-    expect(findExistingDirectMessage(snapshot, "U_ALEX")?.id).toBe("D_ALEX");
-    expect(findExistingDirectMessage(snapshot, "U_SAM")).toBeUndefined();
+    expect(directory.findDirectMessage("U_ALEX")?.id).toBe("D_ALEX");
+    expect(directory.findDirectMessage("U_SAM")).toBeUndefined();
   });
 });

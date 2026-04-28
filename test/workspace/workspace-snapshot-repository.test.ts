@@ -1,21 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../src/slack/desktop.js", () => ({
-  callSlackDesktopApi: vi.fn(),
-  getSlackDesktopCredential: vi.fn(),
+vi.mock("../../src/session/default-desktop-session.js", () => ({
+  getWorkspaceCredential: vi.fn(),
+  requestWorkspace: vi.fn(),
 }));
 
-const { callSlackDesktopApi, getSlackDesktopCredential } = await import(
-  "../../src/slack/desktop.js"
+const { getWorkspaceCredential, requestWorkspace } = await import(
+  "../../src/session/default-desktop-session.js"
 );
-const { readSlackWorkspaceSnapshot } = await import("../../src/slack/state.js");
+const { WorkspaceSnapshotRepository } = await import(
+  "../../src/workspace/workspace-snapshot-repository.js"
+);
 
-describe("readSlackWorkspaceSnapshot", () => {
-  const mockedCallSlackDesktopApi = vi.mocked(callSlackDesktopApi);
-  const mockedGetSlackDesktopCredential = vi.mocked(getSlackDesktopCredential);
+describe("WorkspaceSnapshotRepository", () => {
+  const mockedRequestWorkspace = vi.mocked(requestWorkspace);
+  const mockedGetWorkspaceCredential = vi.mocked(getWorkspaceCredential);
 
   beforeEach(() => {
-    mockedGetSlackDesktopCredential.mockResolvedValue({
+    mockedGetWorkspaceCredential.mockResolvedValue({
       appPath: "/example/Slack.app",
       cookie: "xoxd-cookie",
       dataDir: "/example/data",
@@ -27,11 +29,11 @@ describe("readSlackWorkspaceSnapshot", () => {
       userId: "U_SELF",
       userName: "self",
     });
-    mockedCallSlackDesktopApi.mockReset();
+    mockedRequestWorkspace.mockReset();
   });
 
   it("loads paginated users and conversations through the desktop API", async () => {
-    mockedCallSlackDesktopApi
+    mockedRequestWorkspace
       .mockResolvedValueOnce({
         members: [
           {
@@ -82,7 +84,7 @@ describe("readSlackWorkspaceSnapshot", () => {
         response_metadata: {},
       });
 
-    const snapshot = await readSlackWorkspaceSnapshot();
+    const snapshot = await new WorkspaceSnapshotRepository().read();
 
     expect(snapshot.teamId).toBe("T_EXAMPLE");
     expect(snapshot.users).toMatchObject([
@@ -109,11 +111,11 @@ describe("readSlackWorkspaceSnapshot", () => {
         userId: "U_ALEX",
       },
     ]);
-    expect(mockedCallSlackDesktopApi).toHaveBeenNthCalledWith(1, "users.list", {
+    expect(mockedRequestWorkspace).toHaveBeenNthCalledWith(1, "users.list", {
       cursor: undefined,
       limit: 200,
     });
-    expect(mockedCallSlackDesktopApi).toHaveBeenNthCalledWith(
+    expect(mockedRequestWorkspace).toHaveBeenNthCalledWith(
       2,
       "conversations.list",
       {
@@ -123,11 +125,11 @@ describe("readSlackWorkspaceSnapshot", () => {
         types: "public_channel,private_channel,im,mpim",
       },
     );
-    expect(mockedCallSlackDesktopApi).toHaveBeenNthCalledWith(3, "users.list", {
+    expect(mockedRequestWorkspace).toHaveBeenNthCalledWith(3, "users.list", {
       cursor: "users-page-2",
       limit: 200,
     });
-    expect(mockedCallSlackDesktopApi).toHaveBeenNthCalledWith(
+    expect(mockedRequestWorkspace).toHaveBeenNthCalledWith(
       4,
       "conversations.list",
       {

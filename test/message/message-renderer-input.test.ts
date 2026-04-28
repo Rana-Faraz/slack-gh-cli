@@ -1,23 +1,21 @@
 import { describe, expect, it } from "vitest";
-import {
-  resolveMessageInput,
-  translateMarkdownToSlack,
-} from "../../src/slack/message.js";
+import { MessageInputResolver } from "../../src/message/message-input.js";
+import { MessageRenderer } from "../../src/message/message-renderer.js";
 import { users } from "../fixtures/slack.js";
 
-describe("translateMarkdownToSlack", () => {
+describe("MessageRenderer", () => {
+  const renderer = new MessageRenderer();
+
   it("translates common markdown into Slack mrkdwn", () => {
     expect(
-      translateMarkdownToSlack(
-        "**ship it** *soon* [docs](https://example.test/docs)",
-      ),
+      renderer.render("**ship it** *soon* [docs](https://example.test/docs)"),
     ).toBe("*ship it* _soon_ <https://example.test/docs|docs>");
   });
 
   it("resolves user handles outside code spans", () => {
-    expect(
-      translateMarkdownToSlack("hi @alex.morgan and `@sam.rivera`", users),
-    ).toBe("hi <@U_ALEX> and `@sam.rivera`");
+    expect(renderer.render("hi @alex.morgan and `@sam.rivera`", users)).toBe(
+      "hi <@U_ALEX> and `@sam.rivera`",
+    );
   });
 
   it("preserves fenced code blocks while translating surrounding text", () => {
@@ -29,7 +27,7 @@ describe("translateMarkdownToSlack", () => {
       "@sam.rivera",
     ].join("\n");
 
-    expect(translateMarkdownToSlack(message, users)).toBe([
+    expect(renderer.render(message, users)).toBe([
       "*before*",
       "```",
       "**not bold** @alex.morgan",
@@ -39,16 +37,18 @@ describe("translateMarkdownToSlack", () => {
   });
 
   it("leaves unknown handles unchanged", () => {
-    expect(translateMarkdownToSlack("hello @unknown.person", users)).toBe(
+    expect(renderer.render("hello @unknown.person", users)).toBe(
       "hello @unknown.person",
     );
   });
 });
 
-describe("resolveMessageInput", () => {
+describe("MessageInputResolver", () => {
+  const resolver = new MessageInputResolver();
+
   it("uses explicit message text first", async () => {
     await expect(
-      resolveMessageInput({
+      resolver.resolve({
         inputStream: streamChunks(["ignored"]),
         message: "hello",
         stdin: true,
@@ -58,7 +58,7 @@ describe("resolveMessageInput", () => {
 
   it("reads non-empty piped text and trims trailing newlines", async () => {
     await expect(
-      resolveMessageInput({
+      resolver.resolve({
         inputStream: streamChunks(["hello", " world\n"]),
         stdin: true,
       }),
@@ -67,7 +67,7 @@ describe("resolveMessageInput", () => {
 
   it("rejects missing message text", async () => {
     await expect(
-      resolveMessageInput({
+      resolver.resolve({
         inputStream: streamChunks(["\n"]),
         stdin: true,
       }),
@@ -75,7 +75,9 @@ describe("resolveMessageInput", () => {
   });
 });
 
-async function* streamChunks(chunks: Array<Buffer | string>): AsyncIterable<Buffer | string> {
+async function* streamChunks(
+  chunks: Array<Buffer | string>,
+): AsyncIterable<Buffer | string> {
   for (const chunk of chunks) {
     yield chunk;
   }

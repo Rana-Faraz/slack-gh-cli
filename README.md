@@ -76,9 +76,25 @@ slack dm send --handle @alex.morgan --message "hello"
 
 `auth login` opens Slack Desktop. Sign in there, then re-run `auth status`.
 
+## Architecture
+
+The domain vocabulary lives in `CONTEXT.md`. The code follows that vocabulary so the CLI stays navigable as new operating systems and workflows are added.
+
+The main Modules are:
+
+- `src/session/desktop-session-manager.ts` is the command-facing Desktop Session facade.
+- `src/session/credential-scanner.ts` reads local desktop state and validates cached credentials.
+- `src/session/workspace-catalog.ts` lists and resolves known workspaces.
+- `src/session/workspace-api-client.ts` sends Slack Web requests with the selected Workspace Credential.
+- `src/workspace/workspace-snapshot-repository.ts` loads the selected Workspace Snapshot.
+- `src/workspace/workspace-directory.ts` queries and resolves users, channels, and direct-message conversations.
+- `src/message/message-dispatch.ts` coordinates message input, rendering, destination resolution, dry runs, and posting.
+- `src/platform/macos-slack-desktop-host.ts` is the macOS Desktop Session adapter.
+- `src/commands/*` are thin Commander adapters.
+
 ## Slack Desktop auth
 
-This project intentionally targets Slack Desktop for macOS. It shells out to macOS tools that are already present on a normal Mac:
+This project intentionally targets Slack Desktop for macOS through a platform adapter. It shells out to macOS tools that are already present on a normal Mac:
 
 - `open` to launch Slack Desktop
 - `security` to read Slack's safe-storage key from Keychain
@@ -87,20 +103,10 @@ This project intentionally targets Slack Desktop for macOS. It shells out to mac
 
 The Slack behavior is separated from OS access:
 
-- `src/slack/desktop-client.ts` owns auth, workspace selection, and Slack API behavior against a small host interface
+- `src/platform/desktop-host.ts` defines the Desktop Host interface
 - `src/platform/macos-slack-desktop-host.ts` owns macOS paths, Keychain access, app launch, and cookie storage details
-- `src/slack/desktop-store.ts` owns reusable LevelDB token parsing and cookie decryption helpers
-
-Optional overrides:
-
-- `SLACK_DESKTOP_WORKSPACE` to pick a workspace by ID, domain, or name
-- `SLACK_DESKTOP_TEAM_ID` to pick a workspace by team ID
-
-Example `.env`:
-
-```bash
-SLACK_DESKTOP_WORKSPACE=example-workspace
-```
+- `src/platform/desktop-store.ts` owns reusable LevelDB token parsing and cookie decryption helpers
+- `src/session/*` owns credential selection, workspace preference, and Slack Web requests
 
 ## Workspace selection
 
@@ -153,4 +159,4 @@ npm run test
 npm run test:coverage
 ```
 
-The test suite uses portable fixtures and mocked Slack API boundaries. It does not read real Slack Desktop data, Keychain entries, browser profiles, or OS-specific app paths. Coverage intentionally excludes the live OS adapter in `src/platform/` and the thin default wrapper in `src/slack/desktop.ts`; the reusable LevelDB token parsing, cookie decryption, and platform-neutral Slack Desktop client logic are covered with temp-directory fixtures and fake hosts.
+The test suite uses portable fixtures and fake adapters. It does not read real Slack Desktop data, Keychain entries, browser profiles, or OS-specific app paths. Coverage intentionally excludes the live OS adapter in `src/platform/` and singleton default-session adapters; the reusable LevelDB token parsing, cookie decryption, desktop-session Modules, workspace directory, snapshot loading, and message dispatch behavior are covered through their public Interfaces.

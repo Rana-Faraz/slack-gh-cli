@@ -1,10 +1,18 @@
 import { Command } from "commander";
-import { setSlackDesktopWorkspaceOverride } from "../slack/desktop.js";
-import { liveSearchChannels } from "../slack/live-search.js";
-import { listChannels, readSlackWorkspaceSnapshot } from "../slack/state.js";
-import { sendChannelMessage } from "../slack/send.js";
-import type { ChannelSendOptions, WorkspaceScopedOptions } from "../slack/types.js";
+import { parsePositiveIntegerOption } from "../cli/options.js";
+import { printChannels } from "../cli/presenters.js";
+import type { WorkspaceScopedOptions } from "../cli/options.js";
+import type { ChannelSendOptions } from "../domain/message.js";
+import { sendChannelMessage } from "../message/default-message-dispatch.js";
+import { setWorkspaceOverride } from "../session/default-desktop-session.js";
+import {
+  listCurrentChannels,
+  searchCurrentChannels,
+} from "../workspace/current-workspace.js";
 
+/**
+ * Registers channel commands on the root CLI program.
+ */
 export function registerChannelCommands(program: Command): void {
   const channel = program.command("channel").description("Work with Slack channels.");
 
@@ -14,13 +22,10 @@ export function registerChannelCommands(program: Command): void {
     .option("-L, --limit <limit>", "Number of channels to show", "20")
     .option("-w, --workspace <workspace>", "Workspace ID, domain, or name")
     .action(async (options: { limit: string } & WorkspaceScopedOptions) => {
-      setSlackDesktopWorkspaceOverride(options.workspace);
-      const snapshot = await readSlackWorkspaceSnapshot();
-      const items = listChannels(snapshot, parseLimit(options.limit));
-
-      for (const item of items) {
-        console.log(`#${item.name}\t${item.id}\t${item.visibility}`);
-      }
+      setWorkspaceOverride(options.workspace);
+      printChannels(
+        await listCurrentChannels(parsePositiveIntegerOption("limit", options.limit)),
+      );
     });
 
   channel
@@ -30,12 +35,10 @@ export function registerChannelCommands(program: Command): void {
     .option("-L, --limit <limit>", "Number of channels to show", "20")
     .option("-w, --workspace <workspace>", "Workspace ID, domain, or name")
     .action(async (query: string, options: { limit: string } & WorkspaceScopedOptions) => {
-      setSlackDesktopWorkspaceOverride(options.workspace);
-      const items = await liveSearchChannels(query, parseLimit(options.limit));
-
-      for (const item of items) {
-        console.log(`#${item.name}\t${item.id}\t${item.visibility}`);
-      }
+      setWorkspaceOverride(options.workspace);
+      printChannels(
+        await searchCurrentChannels(query, parsePositiveIntegerOption("limit", options.limit)),
+      );
     });
 
   channel
@@ -48,17 +51,7 @@ export function registerChannelCommands(program: Command): void {
     .option("--dry-run", "Resolve target and show the translated message without sending")
     .option("-w, --workspace <workspace>", "Workspace ID, domain, or name")
     .action(async (options: ChannelSendOptions) => {
-      setSlackDesktopWorkspaceOverride(options.workspace);
+      setWorkspaceOverride(options.workspace);
       await sendChannelMessage(options);
     });
-}
-
-function parseLimit(value: string): number {
-  const limit = Number.parseInt(value, 10);
-
-  if (!Number.isInteger(limit) || limit < 1) {
-    throw new Error(`Invalid limit: ${value}`);
-  }
-
-  return limit;
 }

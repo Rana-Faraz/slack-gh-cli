@@ -3,11 +3,11 @@ import { pbkdf2Sync } from "node:crypto";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import type { SlackDesktopHost } from "../slack/desktop-client.js";
+import type { DesktopHost } from "./desktop-host.js";
 import {
-  decryptChromiumCookieValue,
-  readSlackLocalConfigTokensFromLevelDb,
-} from "../slack/desktop-store.js";
+  decryptDesktopCookieValue,
+  readLocalConfigTokensFromLevelDb,
+} from "./desktop-store.js";
 
 const SLACK_APP_PATH = "/Applications/Slack.app";
 const SLACK_DATA_DIR = join(homedir(), "Library", "Application Support", "Slack");
@@ -21,7 +21,10 @@ type SlackCliConfig = {
   workspace?: string;
 };
 
-export function createMacSlackDesktopHost(): SlackDesktopHost {
+/**
+ * Creates the macOS adapter that reads Slack Desktop's local session.
+ */
+export function createMacSlackDesktopHost(): DesktopHost {
   return {
     appPath: SLACK_APP_PATH,
     dataDir: SLACK_DATA_DIR,
@@ -60,7 +63,7 @@ export function createMacSlackDesktopHost(): SlackDesktopHost {
     },
     readClientTokens: async () => {
       try {
-        return await readSlackLocalConfigTokensFromLevelDb(LOCAL_STORAGE_DIR);
+        return await readLocalConfigTokensFromLevelDb(LOCAL_STORAGE_DIR);
       } catch (error) {
         const message = error instanceof Error ? error.message : "unknown error";
         throw new Error(`Could not read Slack Desktop LevelDB token cache: ${message}`);
@@ -77,7 +80,7 @@ async function readCookie(name: string): Promise<string> {
 
   for (const row of cookieRows) {
     for (const key of keys) {
-      const decrypted = decryptChromiumCookieValue(row.hostKey, row.encryptedValue, key);
+      const decrypted = decryptDesktopCookieValue(row.hostKey, row.encryptedValue, key);
 
       if (decrypted && (name !== "d" || decrypted.startsWith("xoxd-"))) {
         return decrypted;

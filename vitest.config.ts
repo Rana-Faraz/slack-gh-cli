@@ -7,8 +7,11 @@ export default defineConfig({
       exclude: [
         "dist/**",
         "src/index.ts",
-        "src/platform/**",
-        "src/slack/desktop.ts",
+        "src/platform/desktop-host.ts",
+        "src/platform/macos-slack-desktop-host.ts",
+        "src/message/default-message-dispatch.ts",
+        "src/session/default-desktop-session.ts",
+        "src/workspace/current-workspace.ts",
         "test/**",
         "vitest.config.ts",
       ],

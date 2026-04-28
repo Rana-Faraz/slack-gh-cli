@@ -1,11 +1,15 @@
 import { Command } from "commander";
+import { printCurrentWorkspace, printWorkspaceList } from "../cli/presenters.js";
 import {
-  clearSlackDesktopWorkspacePreference,
-  getCurrentSlackDesktopWorkspace,
-  listSlackDesktopWorkspaces,
-  saveSlackDesktopWorkspacePreference,
-} from "../slack/desktop.js";
+  clearWorkspacePreference,
+  getCurrentDesktopWorkspace,
+  listDesktopWorkspaces,
+  saveWorkspacePreference,
+} from "../session/default-desktop-session.js";
 
+/**
+ * Registers workspace selection commands on the root CLI program.
+ */
 export function registerWorkspaceCommands(program: Command): void {
   const workspace = program
     .command("workspace")
@@ -15,52 +19,14 @@ export function registerWorkspaceCommands(program: Command): void {
     .command("list")
     .description("List Slack Desktop workspaces with cached auth.")
     .action(async () => {
-      const items = await listSlackDesktopWorkspaces();
-
-      for (const item of items) {
-        const markers = [
-          item.selectedInDesktop ? "desktop" : undefined,
-          item.configuredDefault ? "default" : undefined,
-          item.authenticated ? "auth" : "no-auth",
-        ]
-          .filter(Boolean)
-          .join(",");
-
-        console.log(
-          [
-            item.name,
-            item.id,
-            item.domain ?? "",
-            item.userId ?? "",
-            markers,
-          ].join("\t"),
-        );
-      }
+      printWorkspaceList(await listDesktopWorkspaces());
     });
 
   workspace
     .command("current")
     .description("Show the workspace currently selected by the CLI.")
     .action(async () => {
-      const current = await getCurrentSlackDesktopWorkspace();
-
-      console.log(`Workspace: ${current.name}`);
-      console.log(`Workspace ID: ${current.id}`);
-
-      if (current.domain) {
-        console.log(`Domain: ${current.domain}`);
-      }
-
-      if (current.userName) {
-        console.log(`User: ${current.userName}`);
-      }
-
-      if (current.userId) {
-        console.log(`User ID: ${current.userId}`);
-      }
-
-      console.log(`Selected in Slack Desktop: ${current.selectedInDesktop ? "yes" : "no"}`);
-      console.log(`Configured default: ${current.configuredDefault ? "yes" : "no"}`);
+      printCurrentWorkspace(await getCurrentDesktopWorkspace());
     });
 
   workspace
@@ -68,7 +34,7 @@ export function registerWorkspaceCommands(program: Command): void {
     .description("Set the default workspace by ID, domain, or exact name.")
     .argument("<workspace>", "Workspace ID, domain, or name")
     .action(async (workspaceSelector: string) => {
-      const selected = await saveSlackDesktopWorkspacePreference(workspaceSelector);
+      const selected = await saveWorkspacePreference(workspaceSelector);
       console.log(`Default workspace set to ${selected.name} (${selected.id}).`);
     });
 
@@ -76,7 +42,7 @@ export function registerWorkspaceCommands(program: Command): void {
     .command("clear")
     .description("Clear the saved default workspace and follow Slack Desktop again.")
     .action(async () => {
-      const removed = await clearSlackDesktopWorkspacePreference();
+      const removed = await clearWorkspacePreference();
       console.log(
         removed
           ? "Default workspace cleared."

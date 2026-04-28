@@ -1,39 +1,30 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { makeSnapshot } from "./fixtures/slack.js";
 
-vi.mock("../src/slack/desktop.js", () => ({
-  clearSlackDesktopWorkspacePreference: vi.fn(),
-  getCurrentSlackDesktopWorkspace: vi.fn(),
-  listSlackDesktopWorkspaces: vi.fn(),
-  lookupSlackDesktopAuth: vi.fn(),
-  openSlackDesktopLogin: vi.fn(),
-  saveSlackDesktopWorkspacePreference: vi.fn(),
-  setSlackDesktopWorkspaceOverride: vi.fn(),
+vi.mock("../src/session/default-desktop-session.js", () => ({
+  clearWorkspacePreference: vi.fn(),
+  getCurrentDesktopWorkspace: vi.fn(),
+  listDesktopWorkspaces: vi.fn(),
+  lookupDesktopSession: vi.fn(),
+  openDesktopLogin: vi.fn(),
+  saveWorkspacePreference: vi.fn(),
+  setWorkspaceOverride: vi.fn(),
 }));
 
-vi.mock("../src/slack/state.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../src/slack/state.js")>();
-
-  return {
-    ...actual,
-    readSlackWorkspaceSnapshot: vi.fn(),
-  };
-});
-
-vi.mock("../src/slack/live-search.js", () => ({
-  liveSearchChannels: vi.fn(),
-  liveSearchUsers: vi.fn(),
+vi.mock("../src/workspace/current-workspace.js", () => ({
+  listCurrentChannels: vi.fn(),
+  listCurrentDirectMessages: vi.fn(),
+  searchCurrentChannels: vi.fn(),
+  searchCurrentUsers: vi.fn(),
 }));
 
-vi.mock("../src/slack/send.js", () => ({
+vi.mock("../src/message/default-message-dispatch.js", () => ({
   sendChannelMessage: vi.fn(),
   sendDirectMessage: vi.fn(),
 }));
 
-const desktop = await import("../src/slack/desktop.js");
-const state = await import("../src/slack/state.js");
-const liveSearch = await import("../src/slack/live-search.js");
-const send = await import("../src/slack/send.js");
+const desktopSession = await import("../src/session/default-desktop-session.js");
+const currentWorkspace = await import("../src/workspace/current-workspace.js");
+const messageDispatch = await import("../src/message/default-message-dispatch.js");
 const { createSlackProgram } = await import("../src/cli.js");
 
 describe("command actions", () => {
@@ -48,18 +39,28 @@ describe("command actions", () => {
       logs.push(String(message ?? ""));
     });
     process.exitCode = undefined;
-    vi.mocked(state.readSlackWorkspaceSnapshot).mockResolvedValue(makeSnapshot());
-    vi.mocked(liveSearch.liveSearchChannels).mockResolvedValue([
+    vi.mocked(currentWorkspace.listCurrentChannels).mockResolvedValue([
+      { id: "C_GENERAL", name: "general", visibility: "public" },
+    ]);
+    vi.mocked(currentWorkspace.searchCurrentChannels).mockResolvedValue([
       { id: "C_PROJECT", name: "project-updates", visibility: "private" },
     ]);
-    vi.mocked(liveSearch.liveSearchUsers).mockResolvedValue([
+    vi.mocked(currentWorkspace.listCurrentDirectMessages).mockResolvedValue([
+      {
+        conversationId: "D_ALEX",
+        displayName: "Alex Morgan",
+        handle: "alex.morgan",
+        userId: "U_ALEX",
+      },
+    ]);
+    vi.mocked(currentWorkspace.searchCurrentUsers).mockResolvedValue([
       {
         displayName: "Alex Morgan",
         handle: "alex.morgan",
         userId: "U_ALEX",
       },
     ]);
-    vi.mocked(desktop.lookupSlackDesktopAuth).mockResolvedValue({
+    vi.mocked(desktopSession.lookupDesktopSession).mockResolvedValue({
       appPath: "/example/Slack.app",
       available: true,
       dataDir: "/example/data",
@@ -70,7 +71,7 @@ describe("command actions", () => {
       userId: "U_SELF",
       userName: "self",
     });
-    vi.mocked(desktop.listSlackDesktopWorkspaces).mockResolvedValue([
+    vi.mocked(desktopSession.listDesktopWorkspaces).mockResolvedValue([
       {
         authenticated: true,
         configuredDefault: false,
@@ -81,7 +82,7 @@ describe("command actions", () => {
         userId: "U_SELF",
       },
     ]);
-    vi.mocked(desktop.getCurrentSlackDesktopWorkspace).mockResolvedValue({
+    vi.mocked(desktopSession.getCurrentDesktopWorkspace).mockResolvedValue({
       authenticated: true,
       configuredDefault: true,
       domain: "example",
@@ -91,20 +92,20 @@ describe("command actions", () => {
       userId: "U_SELF",
       userName: "self",
     });
-    vi.mocked(desktop.saveSlackDesktopWorkspacePreference).mockResolvedValue({
+    vi.mocked(desktopSession.saveWorkspacePreference).mockResolvedValue({
       authenticated: true,
       configuredDefault: true,
       id: "T_EXAMPLE",
       name: "Example",
       selectedInDesktop: true,
     });
-    vi.mocked(desktop.clearSlackDesktopWorkspacePreference).mockResolvedValue(true);
+    vi.mocked(desktopSession.clearWorkspacePreference).mockResolvedValue(true);
   });
 
   it("prints auth status", async () => {
     await parse("auth", "status", "--workspace", "example");
 
-    expect(desktop.setSlackDesktopWorkspaceOverride).toHaveBeenCalledWith("example");
+    expect(desktopSession.setWorkspaceOverride).toHaveBeenCalledWith("example");
     expect(logs).toContain("Slack Desktop authentication is available.");
     expect(logs).toContain("Slack Desktop workspace ID: T_EXAMPLE");
   });
@@ -122,7 +123,7 @@ describe("command actions", () => {
     await parse("workspace", "use", "example");
     await parse("workspace", "clear");
 
-    expect(desktop.saveSlackDesktopWorkspacePreference).toHaveBeenCalledWith("example");
+    expect(desktopSession.saveWorkspacePreference).toHaveBeenCalledWith("example");
     expect(logs).toContain("Default workspace set to Example (T_EXAMPLE).");
     expect(logs).toContain("Default workspace cleared.");
   });
@@ -133,9 +134,9 @@ describe("command actions", () => {
     await parse("channel", "send", "--channel", "general", "--message", "hello");
 
     expect(logs).toContain("#general\tC_GENERAL\tpublic");
-    expect(liveSearch.liveSearchChannels).toHaveBeenCalledWith("project", 5);
+    expect(currentWorkspace.searchCurrentChannels).toHaveBeenCalledWith("project", 5);
     expect(logs).toContain("#project-updates\tC_PROJECT\tprivate");
-    expect(send.sendChannelMessage).toHaveBeenCalledWith({
+    expect(messageDispatch.sendChannelMessage).toHaveBeenCalledWith({
       channel: "general",
       message: "hello",
     });
@@ -147,8 +148,8 @@ describe("command actions", () => {
     await parse("dm", "send", "--handle", "@alex.morgan", "--message", "hello");
 
     expect(logs).toContain("Alex Morgan\t@alex.morgan\tU_ALEX");
-    expect(liveSearch.liveSearchUsers).toHaveBeenCalledWith("alex", 20);
-    expect(send.sendDirectMessage).toHaveBeenCalledWith({
+    expect(currentWorkspace.searchCurrentUsers).toHaveBeenCalledWith("alex", 20);
+    expect(messageDispatch.sendDirectMessage).toHaveBeenCalledWith({
       handle: "@alex.morgan",
       message: "hello",
     });

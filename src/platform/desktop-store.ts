@@ -6,7 +6,7 @@ import { ClassicLevel } from "classic-level";
 
 const COOKIE_IV = Buffer.from("                ");
 
-type SlackLocalConfig = {
+type DesktopLocalConfig = {
   teams?: Record<
     string,
     {
@@ -15,7 +15,10 @@ type SlackLocalConfig = {
   >;
 };
 
-export async function readSlackLocalConfigTokensFromLevelDb(
+/**
+ * Reads cached workspace client tokens from Slack Desktop's copied LevelDB store.
+ */
+export async function readLocalConfigTokensFromLevelDb(
   localStorageDir: string,
   options: {
     tempRoot?: string;
@@ -23,7 +26,7 @@ export async function readSlackLocalConfigTokensFromLevelDb(
   } = {},
 ): Promise<string[]> {
   const tempDir = await mkdtemp(
-    join(options.tempRoot ?? tmpdir(), options.tempPrefix ?? "slack-leveldb-"),
+    join(options.tempRoot ?? tmpdir(), options.tempPrefix ?? "desktop-leveldb-"),
   );
   const copiedStorageDir = join(tempDir, "leveldb");
   const tokens = new Set<string>();
@@ -43,10 +46,10 @@ export async function readSlackLocalConfigTokensFromLevelDb(
         continue;
       }
 
-      let localConfig: SlackLocalConfig;
+      let localConfig: DesktopLocalConfig;
 
       try {
-        localConfig = parseChromiumLocalStorageJson<SlackLocalConfig>(value);
+        localConfig = parseDesktopLocalStorageJson<DesktopLocalConfig>(value);
       } catch {
         continue;
       }
@@ -68,12 +71,18 @@ export async function readSlackLocalConfigTokensFromLevelDb(
   return [...tokens];
 }
 
-export function parseChromiumLocalStorageJson<T>(value: string): T {
+/**
+ * Parses local storage JSON values, including Electron values with a binary prefix.
+ */
+export function parseDesktopLocalStorageJson<T>(value: string): T {
   const normalizedValue = value.charCodeAt(0) === 1 ? value.slice(1) : value;
   return JSON.parse(normalizedValue) as T;
 }
 
-export function decryptChromiumCookieValue(
+/**
+ * Decrypts an encrypted desktop cookie value using the platform safe-storage key.
+ */
+export function decryptDesktopCookieValue(
   hostKey: string,
   encryptedValue: Buffer,
   key: Buffer,

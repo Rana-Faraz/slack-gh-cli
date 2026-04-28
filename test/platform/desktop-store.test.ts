@@ -5,10 +5,10 @@ import { join } from "node:path";
 import { ClassicLevel } from "classic-level";
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  decryptChromiumCookieValue,
-  parseChromiumLocalStorageJson,
-  readSlackLocalConfigTokensFromLevelDb,
-} from "../../src/slack/desktop-store.js";
+  decryptDesktopCookieValue,
+  parseDesktopLocalStorageJson,
+  readLocalConfigTokensFromLevelDb,
+} from "../../src/platform/desktop-store.js";
 
 const tempDirs: string[] = [];
 
@@ -19,11 +19,11 @@ afterEach(async () => {
 });
 
 describe("desktop-store", () => {
-  it("parses Chromium local storage JSON values with or without the binary prefix", () => {
-    expect(parseChromiumLocalStorageJson<{ ok: boolean }>('\u0001{"ok":true}')).toEqual({
+  it("parses desktop local storage JSON values with or without the binary prefix", () => {
+    expect(parseDesktopLocalStorageJson<{ ok: boolean }>('\u0001{"ok":true}')).toEqual({
       ok: true,
     });
-    expect(parseChromiumLocalStorageJson<{ ok: boolean }>('{"ok":true}')).toEqual({
+    expect(parseDesktopLocalStorageJson<{ ok: boolean }>('{"ok":true}')).toEqual({
       ok: true,
     });
   });
@@ -50,7 +50,7 @@ describe("desktop-store", () => {
     await db.close();
 
     await expect(
-      readSlackLocalConfigTokensFromLevelDb(levelDbDir, {
+      readLocalConfigTokensFromLevelDb(levelDbDir, {
         tempRoot: await makeTempDir("slack-leveldb-copy-"),
       }),
     ).resolves.toEqual(["xoxc-alpha-token", "xoxc-beta-token"]);
@@ -67,17 +67,17 @@ describe("desktop-store", () => {
     await db.put("_https://app.slack.com\u0000\u0001localConfig_v2", "{not json");
     await db.close();
 
-    await expect(readSlackLocalConfigTokensFromLevelDb(levelDbDir)).resolves.toEqual([]);
+    await expect(readLocalConfigTokensFromLevelDb(levelDbDir)).resolves.toEqual([]);
   });
 
-  it("decrypts Chromium cookie values with host digests", () => {
+  it("decrypts desktop cookie values with host digests", () => {
     const hostKey = ".example.test";
     const key = randomBytes(16);
     const value = "xoxd-cookie-value";
-    const encrypted = encryptChromiumCookieValue(hostKey, value, key);
+    const encrypted = encryptDesktopCookieValue(hostKey, value, key);
 
-    expect(decryptChromiumCookieValue(hostKey, encrypted, key)).toBe(value);
-    expect(decryptChromiumCookieValue(".other.test", encrypted, key)).not.toBe(value);
+    expect(decryptDesktopCookieValue(hostKey, encrypted, key)).toBe(value);
+    expect(decryptDesktopCookieValue(".other.test", encrypted, key)).not.toBe(value);
   });
 });
 
@@ -87,7 +87,7 @@ async function makeTempDir(prefix: string): Promise<string> {
   return dir;
 }
 
-function encryptChromiumCookieValue(
+function encryptDesktopCookieValue(
   hostKey: string,
   value: string,
   key: Buffer,
