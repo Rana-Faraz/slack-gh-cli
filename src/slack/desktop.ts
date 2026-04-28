@@ -1,17 +1,17 @@
 import { execFile } from "node:child_process";
-import { createDecipheriv, createHash, pbkdf2Sync } from "node:crypto";
+import { pbkdf2Sync } from "node:crypto";
 import {
   access,
-  cp,
   mkdir,
-  mkdtemp,
   readFile,
-  rm,
   writeFile,
 } from "node:fs/promises";
-import { homedir, tmpdir } from "node:os";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { ClassicLevel } from "classic-level";
+import {
+  decryptChromiumCookieValue,
+  readSlackLocalConfigTokensFromLevelDb,
+} from "./desktop-store.js";
 
 const SLACK_APP_PATH = "/Applications/Slack.app";
 const SLACK_DATA_DIR = join(homedir(), "Library", "Application Support", "Slack");
@@ -20,7 +20,6 @@ const COOKIE_DB_PATH = join(SLACK_DATA_DIR, "Cookies");
 const ROOT_STATE_PATH = join(SLACK_DATA_DIR, "storage", "root-state.json");
 const CLI_CONFIG_PATH = join(homedir(), ".slack", "config.json");
 const SLACK_SAFE_STORAGE_SERVICES = ["Slack Safe Storage", "Chrome Safe Storage"];
-const COOKIE_IV = Buffer.from("                ");
 
 type SlackApiResponse<T> = T & {
   ok: boolean;
@@ -58,15 +57,6 @@ type SlackRootState = {
 
 type SlackCliConfig = {
   workspace?: string;
-};
-
-type SlackLocalConfig = {
-  teams?: Record<
-    string,
-    {
-      token?: string;
-    }
-  >;
 };
 
 export type SlackDesktopAuthStatus = {
@@ -512,60 +502,12 @@ async function isWorkspaceSelectedInDesktop(teamId: string): Promise<boolean> {
 }
 
 async function readSlackClientTokens(): Promise<string[]> {
-  return await readSlackLocalConfigTokens();
-}
-
-async function readSlackLocalConfigTokens(): Promise<string[]> {
-  const tempDir = await mkdtemp(join(tmpdir(), "slack-leveldb-"));
-  const copiedStorageDir = join(tempDir, "leveldb");
-  const tokens = new Set<string>();
-  let db: ClassicLevel<string, string> | undefined;
-
   try {
-    await cp(LOCAL_STORAGE_DIR, copiedStorageDir, { recursive: true });
-
-    db = new ClassicLevel(copiedStorageDir, {
-      keyEncoding: "utf8",
-      valueEncoding: "utf8",
-    });
-    await db.open();
-
-    for await (const [key, value] of db.iterator()) {
-      if (!key.endsWith("localConfig_v2")) {
-        continue;
-      }
-
-      let localConfig: SlackLocalConfig;
-
-      try {
-        localConfig = parseChromiumLocalStorageJson<SlackLocalConfig>(value);
-      } catch {
-        continue;
-      }
-
-      for (const team of Object.values(localConfig.teams ?? {})) {
-        if (team.token?.startsWith("xoxc-")) {
-          tokens.add(team.token);
-        }
-      }
-    }
+    return await readSlackLocalConfigTokensFromLevelDb(LOCAL_STORAGE_DIR);
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown error";
     throw new Error(`Could not read Slack Desktop LevelDB token cache: ${message}`);
-  } finally {
-    if (db?.status === "open") {
-      await db.close().catch(() => undefined);
-    }
-
-    await rm(tempDir, { recursive: true, force: true });
   }
-
-  return [...tokens];
-}
-
-function parseChromiumLocalStorageJson<T>(value: string): T {
-  const normalizedValue = value.charCodeAt(0) === 1 ? value.slice(1) : value;
-  return JSON.parse(normalizedValue) as T;
 }
 
 async function readSlackCookie(name: string): Promise<string> {
@@ -636,48 +578,6 @@ async function readMacSafeStorageKeys(): Promise<Buffer[]> {
   }
 
   return keys;
-}
-
-function decryptChromiumCookieValue(
-  hostKey: string,
-  encryptedValue: Buffer,
-  key: Buffer,
-): string | undefined {
-  try {
-    const encrypted =
-      encryptedValue.subarray(0, 3).toString() === "v10"
-        ? encryptedValue.subarray(3)
-        : encryptedValue;
-    const decipher = createDecipheriv("aes-128-cbc", key, COOKIE_IV);
-    const decrypted = Buffer.concat([
-      decipher.update(encrypted),
-      decipher.final(),
-    ]);
-    const value = stripCookieHostDigest(hostKey, decrypted).toString("utf8");
-
-    return value.length > 0 ? value : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function stripCookieHostDigest(hostKey: string, decrypted: Buffer): Buffer {
-  if (decrypted.length <= 32) {
-    return decrypted;
-  }
-
-  const digest = decrypted.subarray(0, 32);
-  const expectedDigest = Buffer.from(
-    // Chromium prepends the SHA-256 host digest in newer cookie stores.
-    createHashHostKey(hostKey),
-    "hex",
-  );
-
-  return digest.equals(expectedDigest) ? decrypted.subarray(32) : decrypted;
-}
-
-function createHashHostKey(hostKey: string): string {
-  return createHash("sha256").update(hostKey).digest("hex");
 }
 
 function normalizeWorkspaceSelector(value: string): string {

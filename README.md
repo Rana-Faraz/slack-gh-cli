@@ -139,3 +139,12 @@ slack channel list --workspace T0123456789
 - `--stdin` reads message text from stdin
 - `--dry-run` resolves the target and prints the translated Slack message without sending
 - markdown-ish input is translated to Slack formatting for common cases like bold, italics, code, and links
+
+## Testing
+
+```bash
+npm run test
+npm run test:coverage
+```
+
+The test suite uses portable fixtures and mocked Slack API boundaries. It does not read real Slack Desktop data, Keychain entries, browser profiles, or OS-specific app paths. Coverage intentionally excludes the live Slack Desktop integration wrapper in `src/slack/desktop.ts`; the reusable LevelDB token parsing and cookie decryption logic lives in `src/slack/desktop-store.ts` and is covered with temp-directory fixtures.

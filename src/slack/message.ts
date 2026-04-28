@@ -4,15 +4,17 @@ import type { SlackUser } from "./types.js";
 export async function resolveMessageInput(input: {
   message?: string;
   stdin?: boolean;
+  inputStream?: AsyncIterable<Buffer | string>;
 }): Promise<string> {
   if (input.message && input.message.length > 0) {
     return input.message;
   }
 
   if (input.stdin || !stdin.isTTY) {
+    const inputStream = input.inputStream ?? stdin;
     const chunks: Buffer[] = [];
 
-    for await (const chunk of stdin) {
+    for await (const chunk of inputStream) {
       chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
     }
 
