@@ -1,8 +1,9 @@
 import { Command } from "commander";
+import { setSlackDesktopWorkspaceOverride } from "../slack/desktop.js";
 import { liveSearchUsers } from "../slack/live-search.js";
 import { listDirectMessages, readSlackWorkspaceSnapshot } from "../slack/state.js";
 import { sendDirectMessage } from "../slack/send.js";
-import type { DmSendOptions } from "../slack/types.js";
+import type { DmSendOptions, WorkspaceScopedOptions } from "../slack/types.js";
 
 export function registerDmCommands(program: Command): void {
   const dm = program.command("dm").description("Work with Slack direct messages.");
@@ -11,7 +12,9 @@ export function registerDmCommands(program: Command): void {
     .command("list")
     .description("List existing direct messages.")
     .option("-L, --limit <limit>", "Number of direct messages to show", "20")
-    .action(async (options: { limit: string }) => {
+    .option("-w, --workspace <workspace>", "Workspace ID, domain, or name")
+    .action(async (options: { limit: string } & WorkspaceScopedOptions) => {
+      setSlackDesktopWorkspaceOverride(options.workspace);
       const snapshot = await readSlackWorkspaceSnapshot();
       const items = listDirectMessages(snapshot, parseLimit(options.limit));
 
@@ -25,7 +28,9 @@ export function registerDmCommands(program: Command): void {
     .description("Search people you can message.")
     .argument("<query>", "Direct message search query")
     .option("-L, --limit <limit>", "Number of people to show", "20")
-    .action(async (query: string, options: { limit: string }) => {
+    .option("-w, --workspace <workspace>", "Workspace ID, domain, or name")
+    .action(async (query: string, options: { limit: string } & WorkspaceScopedOptions) => {
+      setSlackDesktopWorkspaceOverride(options.workspace);
       const items = await liveSearchUsers(query, parseLimit(options.limit));
 
       for (const item of items) {
@@ -42,8 +47,9 @@ export function registerDmCommands(program: Command): void {
     .option("-m, --message <message>", "Message text")
     .option("--stdin", "Read message text from stdin")
     .option("--dry-run", "Resolve target and show the translated message without sending")
-    .option("--show-browser", "Show the browser while sending")
+    .option("-w, --workspace <workspace>", "Workspace ID, domain, or name")
     .action(async (options: DmSendOptions) => {
+      setSlackDesktopWorkspaceOverride(options.workspace);
       await sendDirectMessage(options);
     });
 }

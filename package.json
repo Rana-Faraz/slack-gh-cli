@@ -1,11 +1,11 @@
 {
-  "name": "slack-cli",
+  "name": "slack",
   "version": "0.1.0",
   "private": false,
   "description": "A gh-style local CLI for Slack user workflows.",
   "type": "module",
   "bin": {
-    "slack-cli": "./dist/index.js"
+    "slack": "./dist/index.js"
   },
   "files": [
     "dist",
@@ -22,10 +22,9 @@
     "node": ">=22"
   },
   "dependencies": {
+    "classic-level": "^3.0.0",
     "commander": "^13.1.0",
-    "cross-keychain": "^1.1.0",
-    "dotenv": "^17.4.2",
-    "playwright-core": "^1.59.1"
+    "dotenv": "^17.4.2"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

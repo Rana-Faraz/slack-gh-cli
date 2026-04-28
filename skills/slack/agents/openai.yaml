@@ -1,0 +1,4 @@
+interface:
+  display_name: "Slack"
+  short_description: "Use Slack Desktop auth from the local CLI."
+  default_prompt: "Use $slack to inspect Slack Desktop auth, choose a workspace, search people or channels, and send messages with the installed slack command."

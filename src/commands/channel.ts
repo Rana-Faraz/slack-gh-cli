@@ -1,8 +1,9 @@
 import { Command } from "commander";
+import { setSlackDesktopWorkspaceOverride } from "../slack/desktop.js";
 import { liveSearchChannels } from "../slack/live-search.js";
 import { listChannels, readSlackWorkspaceSnapshot } from "../slack/state.js";
 import { sendChannelMessage } from "../slack/send.js";
-import type { ChannelSendOptions } from "../slack/types.js";
+import type { ChannelSendOptions, WorkspaceScopedOptions } from "../slack/types.js";
 
 export function registerChannelCommands(program: Command): void {
   const channel = program.command("channel").description("Work with Slack channels.");
@@ -11,7 +12,9 @@ export function registerChannelCommands(program: Command): void {
     .command("list")
     .description("List channels available to the logged-in user.")
     .option("-L, --limit <limit>", "Number of channels to show", "20")
-    .action(async (options: { limit: string }) => {
+    .option("-w, --workspace <workspace>", "Workspace ID, domain, or name")
+    .action(async (options: { limit: string } & WorkspaceScopedOptions) => {
+      setSlackDesktopWorkspaceOverride(options.workspace);
       const snapshot = await readSlackWorkspaceSnapshot();
       const items = listChannels(snapshot, parseLimit(options.limit));
 
@@ -25,7 +28,9 @@ export function registerChannelCommands(program: Command): void {
     .description("Search channels by name.")
     .argument("<query>", "Channel search query")
     .option("-L, --limit <limit>", "Number of channels to show", "20")
-    .action(async (query: string, options: { limit: string }) => {
+    .option("-w, --workspace <workspace>", "Workspace ID, domain, or name")
+    .action(async (query: string, options: { limit: string } & WorkspaceScopedOptions) => {
+      setSlackDesktopWorkspaceOverride(options.workspace);
       const items = await liveSearchChannels(query, parseLimit(options.limit));
 
       for (const item of items) {
@@ -41,8 +46,9 @@ export function registerChannelCommands(program: Command): void {
     .option("-m, --message <message>", "Message text")
     .option("--stdin", "Read message text from stdin")
     .option("--dry-run", "Resolve target and show the translated message without sending")
-    .option("--show-browser", "Show the browser while sending")
+    .option("-w, --workspace <workspace>", "Workspace ID, domain, or name")
     .action(async (options: ChannelSendOptions) => {
+      setSlackDesktopWorkspaceOverride(options.workspace);
       await sendChannelMessage(options);
     });
 }

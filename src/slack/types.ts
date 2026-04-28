@@ -50,7 +50,7 @@ export type ChannelSendOptions = {
   message?: string;
   stdin?: boolean;
   dryRun?: boolean;
-  showBrowser?: boolean;
+  workspace?: string;
 };
 
 export type DmSendOptions = {
@@ -60,5 +60,9 @@ export type DmSendOptions = {
   message?: string;
   stdin?: boolean;
   dryRun?: boolean;
-  showBrowser?: boolean;
+  workspace?: string;
+};
+
+export type WorkspaceScopedOptions = {
+  workspace?: string;
 };

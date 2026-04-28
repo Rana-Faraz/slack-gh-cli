@@ -1,4 +1,0 @@
-interface:
-  display_name: "Slack CLI"
-  short_description: "Use the local Slack messaging CLI."
-  default_prompt: "Use $slack-cli to inspect Slack auth, search people or channels, and send messages with the installed slack-cli command."

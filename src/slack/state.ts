@@ -1,4 +1,4 @@
-import { getSlackLandingPage, withSlackBrowserContext } from "./browser-session.js";
+import { callSlackDesktopApi, getSlackDesktopCredential } from "./desktop.js";
 import type {
   ChannelListItem,
   DirectMessageListItem,
@@ -7,92 +7,145 @@ import type {
   SlackWorkspaceSnapshot,
 } from "./types.js";
 
-type RawSlackState = {
-  channels: Record<string, any>;
-  members: Record<string, any>;
+type SlackUsersListResponse = {
+  members: Array<{
+    id: string;
+    name?: string;
+    real_name?: string;
+    team_id?: string;
+    deleted?: boolean;
+    is_bot?: boolean;
+    is_app_user?: boolean;
+    profile?: {
+      display_name?: string;
+      display_name_normalized?: string;
+      real_name?: string;
+      real_name_normalized?: string;
+      email?: string;
+    };
+  }>;
+  response_metadata?: {
+    next_cursor?: string;
+  };
+};
+
+type SlackConversationsListResponse = {
+  channels: Array<{
+    id: string;
+    name?: string;
+    name_normalized?: string;
+    is_channel?: boolean;
+    is_group?: boolean;
+    is_im?: boolean;
+    is_mpim?: boolean;
+    is_private?: boolean;
+    is_member?: boolean;
+    is_open?: boolean;
+    user?: string;
+    members?: string[];
+  }>;
+  response_metadata?: {
+    next_cursor?: string;
+  };
 };
 
 export async function readSlackWorkspaceSnapshot(): Promise<SlackWorkspaceSnapshot> {
-  return await withSlackBrowserContext(
-    {
-      headless: true,
-      useProfileCopy: true,
-    },
-    async (context) => {
-      const page = await getSlackLandingPage(context);
-      await page.waitForTimeout(3_000);
+  const [credential, users, conversations] = await Promise.all([
+    getSlackDesktopCredential(),
+    readAllSlackUsers(),
+    readAllSlackConversations(),
+  ]);
+  const usersWithSelf = users.map((user) => ({
+    ...user,
+    isSelf: user.id === credential.userId,
+  }));
 
-      return await page.evaluate(async () => {
-        const localConfig = JSON.parse(localStorage.getItem("localConfig_v2") ?? "null");
-        const lastActiveTeamId = localConfig?.lastActiveTeamId;
-        const team = lastActiveTeamId ? localConfig?.teams?.[lastActiveTeamId] : null;
+  return {
+    teamId: credential.teamId,
+    teamName: credential.teamName,
+    teamDomain: credential.teamDomain,
+    teamUrl: credential.teamUrl,
+    selfUserId: credential.userId,
+    users: usersWithSelf,
+    conversations,
+  };
+}
 
-        const state = await new Promise<RawSlackState>((resolve, reject) => {
-          const req = indexedDB.open("reduxPersistence");
+async function readAllSlackUsers(): Promise<SlackUser[]> {
+  const users: SlackUser[] = [];
+  let cursor: string | undefined;
 
-          req.onerror = () => reject(new Error(String(req.error)));
-          req.onsuccess = () => {
-            const db = req.result;
-            const tx = db.transaction("reduxPersistenceStore", "readonly");
-            const store = tx.objectStore("reduxPersistenceStore");
-            const key = `persist:slack-client-${team?.id}-${team?.user_id}`;
-            const getReq = store.get(key);
+  do {
+    const response = await callSlackDesktopApi<SlackUsersListResponse>("users.list", {
+      limit: 200,
+      cursor,
+    });
 
-            getReq.onerror = () => {
-              db.close();
-              reject(new Error(String(getReq.error)));
-            };
+    users.push(
+      ...response.members.map((member) => ({
+        id: member.id,
+        handle: member.name ?? member.id,
+        displayName:
+          member.profile?.display_name_normalized ||
+          member.profile?.display_name ||
+          member.profile?.real_name_normalized ||
+          member.profile?.real_name ||
+          member.real_name ||
+          member.name ||
+          member.id,
+        realName:
+          member.profile?.real_name_normalized ||
+          member.profile?.real_name ||
+          member.real_name ||
+          "",
+        email: member.profile?.email,
+        isBot: Boolean(member.is_bot || member.is_app_user),
+        deleted: Boolean(member.deleted),
+        isSelf: false,
+      })),
+    );
 
-            getReq.onsuccess = () => {
-              db.close();
-              resolve(getReq.result as RawSlackState);
-            };
-          };
-        });
+    cursor = response.response_metadata?.next_cursor || undefined;
+  } while (cursor);
 
-        const users = Object.values(state.members ?? {}).map((member: any) => ({
-          id: member.id,
-          handle: member.name,
-          displayName:
-            member.profile?.display_name_normalized ||
-            member.profile?.display_name ||
-            member.real_name_normalized ||
-            member.real_name ||
-            member.name,
-          realName:
-            member.real_name_normalized || member.real_name || member.profile?.real_name || "",
-          email: member.profile?.email,
-          isBot: Boolean(member.is_bot),
-          deleted: Boolean(member.deleted),
-          isSelf: Boolean(member.is_self),
-        }));
+  return users;
+}
 
-        const conversations = Object.values(state.channels ?? {}).map((channel: any) => ({
-          id: channel.id,
-          name: channel.name,
-          normalizedName: channel.name_normalized || channel.name || "",
-          kind: (
-            channel.is_im ? "dm" : channel.is_mpim ? "mpdm" : "channel"
-          ) as SlackConversation["kind"],
-          isPrivate: Boolean(channel.is_private || channel.is_group || channel.is_mpim),
-          isMember: Boolean(channel.is_member),
-          userId: channel.user,
-          memberIds: Array.isArray(channel.members) ? channel.members : [],
-          isOpen: Boolean(channel.is_open),
-        }));
+async function readAllSlackConversations(): Promise<SlackConversation[]> {
+  const conversations: SlackConversation[] = [];
+  let cursor: string | undefined;
 
-        return {
-          teamId: team?.id,
-          teamName: team?.name,
-          teamDomain: team?.domain,
-          teamUrl: team?.url,
-          selfUserId: team?.user_id,
-          users,
-          conversations,
-        };
-      });
-    },
-  );
+  do {
+    const response = await callSlackDesktopApi<SlackConversationsListResponse>(
+      "conversations.list",
+      {
+        types: "public_channel,private_channel,im,mpim",
+        exclude_archived: true,
+        limit: 200,
+        cursor,
+      },
+    );
+
+    conversations.push(
+      ...response.channels.map((channel) => ({
+        id: channel.id,
+        name: channel.name ?? channel.id,
+        normalizedName: channel.name_normalized || channel.name || channel.id,
+        kind: (
+          channel.is_im ? "dm" : channel.is_mpim ? "mpdm" : "channel"
+        ) as SlackConversation["kind"],
+        isPrivate: Boolean(channel.is_private || channel.is_group || channel.is_mpim),
+        isMember: Boolean(channel.is_member || channel.is_im || channel.is_mpim),
+        userId: channel.user,
+        memberIds: Array.isArray(channel.members) ? channel.members : [],
+        isOpen: Boolean(channel.is_open),
+      })),
+    );
+
+    cursor = response.response_metadata?.next_cursor || undefined;
+  } while (cursor);
+
+  return conversations;
 }
 
 export function listChannels(
@@ -277,9 +330,10 @@ export function resolveUser(
 
   if (input.handle) {
     const requestedHandle = normalizeHandle(input.handle);
-    const match = candidates.find(
+    const matches = candidates.filter(
       (user) => normalizeHandle(user.handle) === requestedHandle,
     );
+    const match = selectSingleUserMatch(snapshot, matches);
 
     if (!match) {
       throw new Error(`No user found matching handle "${input.handle}".`);
@@ -293,21 +347,13 @@ export function resolveUser(
     const names = [user.displayName, user.realName].map(normalizeQuery);
     return names.includes(requestedName);
   });
+  const match = selectSingleUserMatch(snapshot, matches);
 
-  if (matches.length === 0) {
+  if (!match) {
     throw new Error(`No user found matching "${input.user}".`);
   }
 
-  if (matches.length > 1) {
-    const candidatesLabel = matches
-      .map((user) => `${user.displayName} (@${user.handle})`)
-      .join(", ");
-    throw new Error(
-      `Multiple users matched "${input.user}": ${candidatesLabel}. Use --handle or --user-id.`,
-    );
-  }
-
-  return matches[0];
+  return match;
 }
 
 export function findExistingDirectMessage(
@@ -352,4 +398,27 @@ function normalizeChannelName(value: string): string {
 
 function normalizeHandle(value: string): string {
   return normalizeQuery(value.startsWith("@") ? value.slice(1) : value);
+}
+
+function selectSingleUserMatch(
+  snapshot: SlackWorkspaceSnapshot,
+  matches: SlackUser[],
+): SlackUser | undefined {
+  if (matches.length <= 1) {
+    return matches[0];
+  }
+
+  const matchesWithExistingDm = matches.filter((user) =>
+    Boolean(findExistingDirectMessage(snapshot, user.id)),
+  );
+
+  if (matchesWithExistingDm.length === 1) {
+    return matchesWithExistingDm[0];
+  }
+
+  const candidatesLabel = matches
+    .map((user) => `${user.displayName} (@${user.handle}, ${user.id})`)
+    .join(", ");
+
+  throw new Error(`Multiple users matched: ${candidatesLabel}. Use --user-id.`);
 }
