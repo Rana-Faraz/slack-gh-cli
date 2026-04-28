@@ -85,6 +85,12 @@ This project intentionally targets Slack Desktop for macOS. It shells out to mac
 - `sqlite3` to read Slack Desktop's cookie store
 - Chromium LevelDB to read Slack Desktop's `localConfig_v2` workspace token cache
 
+The Slack behavior is separated from OS access:
+
+- `src/slack/desktop-client.ts` owns auth, workspace selection, and Slack API behavior against a small host interface
+- `src/platform/macos-slack-desktop-host.ts` owns macOS paths, Keychain access, app launch, and cookie storage details
+- `src/slack/desktop-store.ts` owns reusable LevelDB token parsing and cookie decryption helpers
+
 Optional overrides:
 
 - `SLACK_DESKTOP_WORKSPACE` to pick a workspace by ID, domain, or name
@@ -147,4 +153,4 @@ npm run test
 npm run test:coverage
 ```
 
-The test suite uses portable fixtures and mocked Slack API boundaries. It does not read real Slack Desktop data, Keychain entries, browser profiles, or OS-specific app paths. Coverage intentionally excludes the live Slack Desktop integration wrapper in `src/slack/desktop.ts`; the reusable LevelDB token parsing and cookie decryption logic lives in `src/slack/desktop-store.ts` and is covered with temp-directory fixtures.
+The test suite uses portable fixtures and mocked Slack API boundaries. It does not read real Slack Desktop data, Keychain entries, browser profiles, or OS-specific app paths. Coverage intentionally excludes the live OS adapter in `src/platform/` and the thin default wrapper in `src/slack/desktop.ts`; the reusable LevelDB token parsing, cookie decryption, and platform-neutral Slack Desktop client logic are covered with temp-directory fixtures and fake hosts.

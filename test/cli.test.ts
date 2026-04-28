@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createSlackProgram } from "../src/cli.js";
+import { createSlackProgram, runSlackCli } from "../src/cli.js";
+import { vi } from "vitest";
 
 describe("CLI help", () => {
   it("documents the top-level command groups", () => {
@@ -31,5 +32,22 @@ describe("CLI help", () => {
     expect(help).toContain("current");
     expect(help).toContain("use <workspace>");
     expect(help).toContain("clear");
+  });
+
+  it("reports command errors without throwing to the caller", async () => {
+    const errors: string[] = [];
+    const previousExitCode = process.exitCode;
+    vi.spyOn(console, "error").mockImplementation((message?: unknown) => {
+      errors.push(String(message ?? ""));
+    });
+    process.exitCode = undefined;
+
+    await expect(
+      runSlackCli(["node", "slack", "channel", "list", "--limit", "0"]),
+    ).resolves.toBeUndefined();
+
+    expect(errors).toEqual(["Invalid limit: 0"]);
+    expect(process.exitCode).toBe(1);
+    process.exitCode = previousExitCode;
   });
 });

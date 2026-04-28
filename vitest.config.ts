@@ -7,6 +7,7 @@ export default defineConfig({
       exclude: [
         "dist/**",
         "src/index.ts",
+        "src/platform/**",
         "src/slack/desktop.ts",
         "test/**",
         "vitest.config.ts",
