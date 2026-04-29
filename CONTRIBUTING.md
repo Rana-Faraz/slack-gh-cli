@@ -52,10 +52,10 @@ docs: explain security model
 
 Release impact:
 
-- `fix:` publishes a patch release.
-- `feat:` publishes a minor release.
-- `BREAKING CHANGE:` publishes a major release.
-- `docs:`, `test:`, `refactor:`, and `chore:` usually do not publish by themselves.
+- `fix:` creates a patch release.
+- `feat:` creates a minor release.
+- `BREAKING CHANGE:` creates a major release.
+- `docs:`, `test:`, `refactor:`, and `chore:` usually do not release by themselves.
 
 ## Security
 

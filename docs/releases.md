@@ -2,6 +2,8 @@
 
 Releases are automated with GitHub Actions and `semantic-release`.
 
+The project does not publish to the npm registry. npm is used only as the Node.js build/package tool. Release artifacts are published to GitHub Releases, and Homebrew installation is expected to come from the maintainer's Homebrew tap.
+
 ## What Happens on `main`
 
 When commits land on `main`, `.github/workflows/release.yml`:
@@ -20,23 +22,30 @@ If the commit history since the previous release contains releasable conventiona
 - create a release commit
 - create a Git tag like `v1.2.3`
 - create a GitHub Release with generated release notes
-- publish the package to the npm registry
+- attach the generated package tarball to the GitHub Release
 
-## Required Repository Secret
+## Homebrew Tap
 
-Add this GitHub Actions secret:
+The public install path is Homebrew:
 
-```text
-NPM_TOKEN
+```bash
+brew tap Rana-Faraz/tap
+brew install slack-gh-cli
 ```
 
-The token must have permission to publish `slack-gh-cli` to the npm registry.
+The tap repository is:
 
-The workflow uses the built-in `GITHUB_TOKEN` for GitHub Releases and release commits.
+```text
+https://github.com/Rana-Faraz/homebrew-tap
+```
 
-The workflow also enables npm provenance with GitHub Actions OIDC by setting `NPM_CONFIG_PROVENANCE=true` and granting `id-token: write`.
+The Homebrew formula should point to the GitHub Release source or package asset for the released tag and use the matching SHA256.
 
-If `main` has branch protection, allow GitHub Actions to create the semantic-release commit and tag, or configure the release workflow with an appropriate repository token.
+## Required Secrets
+
+No npm token is required.
+
+The workflow uses the built-in `GITHUB_TOKEN` for GitHub Releases, tags, and release commits. If `main` has branch protection, allow GitHub Actions to create the semantic-release commit and tag, or configure the release workflow with an appropriate repository token.
 
 ## Commit Messages
 
@@ -55,9 +64,9 @@ Default release behavior:
 - `fix:` creates a patch release.
 - `feat:` creates a minor release.
 - `BREAKING CHANGE:` in the commit body creates a major release.
-- `docs:`, `test:`, `refactor:`, and `chore:` usually do not publish by themselves unless semantic-release detects a breaking change.
+- `docs:`, `test:`, `refactor:`, and `chore:` usually do not release by themselves unless semantic-release detects a breaking change.
 
-Do not manually edit the package version for normal releases. semantic-release updates `package.json`, `package-lock.json`, `CHANGELOG.md`, the Git tag, GitHub Release, and npm package together.
+Do not manually edit the package version for normal releases. semantic-release updates `package.json`, `package-lock.json`, `CHANGELOG.md`, the Git tag, GitHub Release, and release tarball together.
 
 ## Manual Dry Run
 
@@ -67,8 +76,8 @@ You can inspect what semantic-release would do locally:
 npm run release:dry-run
 ```
 
-This requires repository history and release credentials for remote checks, but it will not publish.
+This requires repository history and GitHub access for remote checks, but it will not publish a release.
 
-## Publishing Manually
+## Manual Publishing
 
-Manual publishing is not the default path. Prefer merging to `main` and letting the release workflow publish from CI.
+Manual publishing is not the default path. Prefer merging to `main` and letting the release workflow publish the GitHub Release from CI.

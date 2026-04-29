@@ -26,14 +26,15 @@ The CLI reuses the signed-in Slack Desktop session on your machine. It does not 
 
 ## Install
 
-Install from npm:
+Install with Homebrew:
 
 ```bash
-npm install -g slack-gh-cli
+brew tap Rana-Faraz/tap
+brew install slack-gh-cli
 slack --help
 ```
 
-Install directly from GitHub:
+Install directly from GitHub with npm, useful for development or testing before a Homebrew formula is updated:
 
 ```bash
 npm install -g https://github.com/Rana-Faraz/slack-gh-cli.git
@@ -236,9 +237,16 @@ The test suite uses portable fixtures and fake adapters. It does not read real S
 
 ## Releases
 
-Releases are automated from `main` with GitHub Actions and semantic-release. Release notes are generated from conventional commits, GitHub Releases are created automatically, and the package is published to npm as `slack-gh-cli`.
+Releases are automated from `main` with GitHub Actions and semantic-release. Release notes are generated from conventional commits, GitHub Releases are created automatically, and a package tarball is attached to each release.
 
-See [docs/releases.md](docs/releases.md) for the release workflow, required `NPM_TOKEN` secret, and commit message rules.
+The public install path is Homebrew:
+
+```bash
+brew tap Rana-Faraz/tap
+brew install slack-gh-cli
+```
+
+See [docs/releases.md](docs/releases.md) for the release workflow and commit message rules.
 
 ## Agent Skill
 
