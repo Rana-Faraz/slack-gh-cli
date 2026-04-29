@@ -10,7 +10,12 @@
         "changelogFile": "CHANGELOG.md"
       }
     ],
-    "@semantic-release/npm",
+    [
+      "@semantic-release/exec",
+      {
+        "prepareCmd": "npm version ${nextRelease.version} --no-git-tag-version && rm -rf release && mkdir -p release && npm pack --pack-destination release"
+      }
+    ],
     [
       "@semantic-release/git",
       {
@@ -18,6 +23,17 @@
         "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
       }
     ],
-    "@semantic-release/github"
+    [
+      "@semantic-release/github",
+      {
+        "assets": [
+          {
+            "path": "release/*.tgz",
+            "label": "Package tarball"
+          }
+        ],
+        "failComment": false
+      }
+    ]
   ]
 }

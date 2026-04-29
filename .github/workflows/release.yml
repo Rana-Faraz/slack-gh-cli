@@ -10,7 +10,6 @@ permissions:
   contents: write
   issues: write
   pull-requests: write
-  id-token: write
 
 concurrency:
   group: release-${{ github.ref }}
@@ -18,7 +17,7 @@ concurrency:
 
 jobs:
   release:
-    name: Release to GitHub and npm
+    name: Release to GitHub
     runs-on: ubuntu-latest
 
     steps:
@@ -32,7 +31,6 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          registry-url: https://registry.npmjs.org
 
       - name: Install
         run: npm ci
@@ -55,6 +53,4 @@ jobs:
       - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_PROVENANCE: true
         run: npm run release
